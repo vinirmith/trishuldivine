@@ -4,7 +4,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (toggle && navList) {
     toggle.addEventListener('click', () => {
-      navList.classList.toggle('open');
+      const isOpen = navList.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    navList.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navList.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
     });
   }
 

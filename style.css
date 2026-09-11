@@ -22,6 +22,11 @@ body:has(.hero) header { background: linear-gradient(to bottom, rgba(22, 29, 21,
 body:has(.hero) header .logo, body:has(.hero) nav a { color: var(--white); }
 body:has(.hero) nav a:hover, body:has(.hero) nav a.active { color: var(--gold); }
 body:has(.hero) .header-whatsapp { border-bottom-color: var(--gold); color: var(--white); }
+body:has(.page-hero) header { background: linear-gradient(to bottom, rgba(10, 9, 8, .55), transparent); border-bottom-color: transparent; }
+body:has(.page-hero) header .logo, body:has(.page-hero) nav a { color: var(--white); }
+body:has(.page-hero) nav a:hover, body:has(.page-hero) nav a.active { color: var(--gold); }
+.page-hero { line-height: 0; overflow: hidden; position: relative; }
+.page-hero img { display: block; height: auto; width: 100%; }
 nav { grid-column: 2; }
 nav ul { display: flex; gap: clamp(18px, 3vw, 42px); list-style: none; }
 nav a, .header-whatsapp { font-size: .72rem; letter-spacing: 1.5px; text-decoration: none; text-transform: uppercase; }
@@ -48,6 +53,27 @@ em { color: var(--clay); font-style: normal; }
 .button-quiet { border-bottom: 1px solid rgba(255, 253, 248, .75); color: var(--white); padding-left: 0; padding-right: 0; }
 .hero-note { bottom: 34px; color: rgba(255, 253, 248, .7); font-size: .67rem; letter-spacing: 1.8px; line-height: 1.8; position: absolute; right: 5vw; text-align: right; text-transform: uppercase; z-index: 1; }
 
+.shop-circles { margin: 0 auto; max-width: 1240px; padding: 54px 5vw 10px; text-align: center; }
+.circle-row-eyebrow { color: var(--clay); font-size: .68rem; font-weight: 500; letter-spacing: 2.6px; margin-bottom: 26px; text-transform: uppercase; }
+.circle-row { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
+.circle-item { align-items: center; animation: circle-pop .6s cubic-bezier(.34, 1.56, .64, 1) both; display: flex; flex-direction: column; gap: 13px; text-decoration: none; }
+.circle-item:nth-child(1) { animation-delay: .05s; }
+.circle-item:nth-child(2) { animation-delay: .15s; }
+.circle-item:nth-child(3) { animation-delay: .25s; }
+.circle-item:nth-child(4) { animation-delay: .35s; }
+.circle-ring { background: conic-gradient(from 180deg, var(--gold), var(--clay), var(--gold)); border-radius: 50%; display: inline-flex; padding: 3px; transition: transform .4s cubic-bezier(.34, 1.56, .64, 1), box-shadow .4s ease; }
+.circle-thumb { background: var(--paper); border-radius: 50%; box-shadow: 0 10px 24px rgba(30, 32, 28, .18); display: block; height: 92px; overflow: hidden; padding: 3px; width: 92px; }
+.circle-thumb img { border-radius: 50%; display: block; height: 100%; object-fit: cover; width: 100%; }
+.circle-item:hover .circle-ring { box-shadow: 0 14px 28px rgba(198, 164, 103, .35); transform: scale(1.08) rotate(6deg); }
+.circle-item:active .circle-ring { transform: scale(.95); }
+.circle-label { color: var(--ink-soft); font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; transition: color .3s ease; }
+.circle-item:hover .circle-label { color: var(--clay); }
+@keyframes circle-pop { from { opacity: 0; transform: translateY(16px) scale(.85); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .circle-item { animation: none; }
+  .circle-ring { transition: none; }
+}
+
 .section-wrap { margin: 0 auto; max-width: 1240px; padding: 120px 5vw; }
 .intro { max-width: 780px; padding-bottom: 130px; text-align: center; }
 h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
@@ -57,30 +83,54 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .text-link { border-bottom: 1px solid var(--clay); color: var(--clay); display: inline-flex; font-size: .72rem; gap: 18px; letter-spacing: 1.3px; padding-bottom: 6px; text-decoration: none; text-transform: uppercase; }
 
 .collections { background: var(--paper-deep); max-width: none; padding-left: max(5vw, calc((100vw - 1140px) / 2)); padding-right: max(5vw, calc((100vw - 1140px) / 2)); }
-.category-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); }
-.category-card { background-position: center; background-size: cover; color: var(--white); display: flex; flex-direction: column; height: 470px; justify-content: flex-end; overflow: hidden; padding: 28px; position: relative; text-decoration: none; }
+.category-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.category-card { background-position: center; background-size: cover; color: var(--white); display: flex; flex-direction: column; height: 470px; justify-content: flex-end; overflow: hidden; padding: 28px; position: relative; text-decoration: none; transition: box-shadow .4s ease, transform .4s ease; }
 .category-card::before { background: linear-gradient(0deg, rgba(25, 29, 22, .82), transparent 70%); content: ''; inset: 0; position: absolute; }
+.category-card:hover { box-shadow: 0 26px 50px rgba(30, 32, 28, .38); transform: translateY(-6px); }
 .category-gemstones { background-image: url('images/gemstone_beads.jpeg'); }
 .category-malas { background-image: url('images/mala-bracelets.jpeg'); }
 .category-rudraksha { background-image: url('images/rudraksha_mala.jpg'); }
+.category-chains { background-image: url('images/chain/chain1.jpeg'); }
 .category-card > * { position: relative; }
 .category-number { color: var(--gold); font-size: .7rem; letter-spacing: 2px; margin-bottom: auto; }
 .category-label { font-family: 'Marcellus', serif; font-size: 1.7rem; }
 .category-description { color: rgba(255, 253, 248, .75); font-size: .85rem; line-height: 1.5; margin-top: 8px; max-width: 210px; }
 .category-arrow { align-self: end; color: var(--gold); font-size: 1.5rem; margin-top: 18px; }
 
+.scroll-showcase { overflow: hidden; padding: 90px 0 120px; }
+.scroll-heading { margin: 0 auto 42px; max-width: 1240px; padding: 0 5vw; }
+.scroll-track-wrap { overflow: hidden; width: 100%; }
+.scroll-track { animation: scroll-x 48s linear infinite; display: flex; gap: 18px; width: max-content; }
+.scroll-track:hover { animation-play-state: paused; }
+.scroll-track a { border-radius: 14px; box-shadow: 0 18px 34px rgba(30, 32, 28, .22); display: block; flex: 0 0 auto; height: 320px; overflow: hidden; width: 230px; }
+.scroll-track img { border-radius: 14px; display: block; height: 100%; object-fit: cover; transition: transform .5s ease; width: 100%; }
+.scroll-track a:hover img { transform: scale(1.06); }
+@keyframes scroll-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
 .zodiac { align-items: center; background: var(--moss); color: var(--white); display: grid; gap: 80px; grid-template-columns: .8fr 1.2fr; max-width: none; padding-left: max(5vw, calc((100vw - 1140px) / 2)); padding-right: max(5vw, calc((100vw - 1140px) / 2)); }
 .zodiac .eyebrow { color: var(--gold); }
 .zodiac-copy > p:not(.eyebrow) { color: rgba(255, 253, 248, .72); line-height: 1.8; margin: 30px 0; max-width: 330px; }
 .zodiac .text-link { color: var(--gold); }
-.zodiac-wheel { align-items: center; aspect-ratio: 1; border: 1px solid rgba(198, 164, 103, .5); border-radius: 50%; display: grid; font-size: .6rem; grid-template-columns: repeat(3, 1fr); letter-spacing: 1.4px; max-width: 440px; padding: 50px; position: relative; text-align: center; }
-.zodiac-wheel::before { border: 1px solid rgba(198, 164, 103, .25); border-radius: 50%; content: ''; inset: 25px; position: absolute; }
-.zodiac-wheel span, .zodiac-wheel b { position: relative; z-index: 1; }
-.zodiac-wheel b { color: var(--gold); font-size: 1.7rem; grid-column: 2; grid-row: 2; }
+.zodiac-wheel { --zw-radius: 205px; --zw-duration: 140s; aspect-ratio: 1; border: 1px solid rgba(198, 164, 103, .5); border-radius: 50%; margin: 0 auto; max-width: 560px; position: relative; text-align: center; width: 100%; }
+.zodiac-wheel::before { border: 1px solid rgba(198, 164, 103, .25); border-radius: 50%; content: ''; inset: 32px; position: absolute; }
+.zodiac-wheel b { animation: zodiac-sun-glow 3.4s ease-in-out infinite; color: var(--gold); font-size: 2.3rem; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); z-index: 2; }
+.zodiac-sign { animation: zodiac-orbit var(--zw-duration) linear infinite; animation-delay: calc(var(--zw-duration) / -12 * var(--i)); height: 0; left: 50%; position: absolute; top: 50%; transform: rotate(calc(360deg / 12 * var(--i))) translateX(var(--zw-radius)); width: 0; }
+.zodiac-sign i { animation: zodiac-orbit-counter var(--zw-duration) linear infinite; animation-delay: calc(var(--zw-duration) / -12 * var(--i)); display: block; font-size: .78rem; font-style: normal; letter-spacing: 1.4px; position: absolute; transform: translate(-50%, -50%) rotate(calc(-360deg / 12 * var(--i))); white-space: nowrap; }
+.zodiac-sign i::before { color: var(--gold); content: attr(data-glyph); display: inline-block; font-size: 2rem; font-variant-emoji: text; margin-right: 9px; vertical-align: middle; }
+.zodiac-wheel:hover .zodiac-sign, .zodiac-wheel:hover .zodiac-sign i { animation-play-state: paused; }
+@keyframes zodiac-orbit { from { transform: rotate(0deg) translateX(var(--zw-radius)); } to { transform: rotate(360deg) translateX(var(--zw-radius)); } }
+@keyframes zodiac-orbit-counter { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(-360deg); } }
+@keyframes zodiac-sun-glow { 0%, 100% { text-shadow: 0 0 12px rgba(198, 164, 103, .6); } 50% { text-shadow: 0 0 26px rgba(198, 164, 103, .95); } }
+@media (prefers-reduced-motion: reduce) {
+  .zodiac-sign, .zodiac-sign i, .zodiac-wheel b { animation: none; }
+}
 
 .featured { background: var(--paper); }
 .product-grid { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); }
-.product-image { align-items: flex-end; background-position: center; background-size: cover; display: flex; height: 390px; padding: 18px; }
+.product-card { transition: transform .4s ease; }
+.product-card:hover { transform: translateY(-6px); }
+.product-image { align-items: flex-end; background-position: center; background-size: cover; display: flex; height: 390px; overflow: hidden; padding: 18px; transition: box-shadow .4s ease; }
+.product-card:hover .product-image { box-shadow: 0 26px 50px rgba(30, 32, 28, .28); }
 .product-image span { background: rgba(255, 253, 248, .9); color: var(--ink-soft); font-size: .62rem; letter-spacing: 1px; padding: 7px 9px; text-transform: uppercase; }
 .product-smoky { background-image: url('images/Gemstone%20bracelets%20smoky-quartz.webp'); }
 .product-mala { background-image: url('images/mala-bracelets.jpeg'); }
@@ -101,7 +151,10 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 
 .journal { background: var(--paper-deep); }
 .journal-grid { display: grid; gap: 50px; grid-template-columns: repeat(2, 1fr); }
-.journal-image { background-position: center; background-size: cover; height: 300px; margin-bottom: 24px; }
+.journal-image { background-position: center; background-size: cover; height: 300px; margin-bottom: 24px; overflow: hidden; transition: box-shadow .4s ease; }
+.journal article { transition: transform .4s ease; }
+.journal article:hover { transform: translateY(-6px); }
+.journal article:hover .journal-image { box-shadow: 0 26px 50px rgba(30, 32, 28, .22); }
 .journal-one { background-image: url('images/gemstone_beads.jpeg'); }
 .journal-two { background-image: url('images/rudraksha_mala.jpg'); }
 .journal article h3 { font-size: 1.6rem; margin: -4px 0 22px; }
@@ -111,11 +164,30 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .closing-cta h2 { margin-bottom: 36px; }
 .closing-cta h2 em { color: var(--gold); }
 
-footer { background: var(--ink); color: rgba(255, 253, 248, .6); font-family: 'Marcellus', serif; font-size: .7rem; letter-spacing: 1.5px; padding: 24px; text-align: center; }
+.site-footer { background: var(--ink); color: rgba(255, 253, 248, .7); padding: 70px 5vw 0; }
+.footer-top { display: grid; gap: 50px; grid-template-columns: 1.4fr 1fr 1fr 1.4fr; margin: 0 auto; max-width: 1240px; padding-bottom: 50px; }
+.footer-logo { color: var(--white); font-family: 'Marcellus', serif; font-size: 1.1rem; letter-spacing: 2.5px; text-decoration: none; text-transform: uppercase; }
+.footer-brand p { color: rgba(255, 253, 248, .6); font-size: .85rem; line-height: 1.7; margin: 18px 0 22px; max-width: 280px; }
+.footer-social { display: flex; gap: 14px; }
+.footer-social a { align-items: center; background: rgba(255, 253, 248, .08); border-radius: 50%; color: var(--white); display: flex; height: 38px; justify-content: center; transition: background .3s ease, color .3s ease; width: 38px; }
+.footer-social a:hover { background: var(--gold); color: var(--ink); }
+.footer-social svg { height: 16px; width: 16px; }
+.footer-links h4, .footer-contact h4 { color: var(--gold); font-family: 'Marcellus', serif; font-size: .85rem; font-weight: 400; letter-spacing: 1.5px; margin-bottom: 20px; text-transform: uppercase; }
+.footer-links ul { display: grid; gap: 12px; list-style: none; }
+.footer-links a { color: rgba(255, 253, 248, .7); font-size: .85rem; text-decoration: none; transition: color .3s ease; }
+.footer-links a:hover { color: var(--gold); }
+.footer-contact p { color: rgba(255, 253, 248, .7); font-size: .85rem; line-height: 1.8; margin-bottom: 14px; }
+.footer-contact a { color: rgba(255, 253, 248, .7); text-decoration: none; transition: color .3s ease; }
+.footer-contact a:hover { color: var(--gold); }
+.footer-bottom { align-items: center; border-top: 1px solid rgba(255, 253, 248, .12); display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin: 0 auto; max-width: 1240px; padding: 26px 0; }
+.footer-bottom p { font-size: .68rem; letter-spacing: 1.3px; margin: 0; text-transform: uppercase; }
+.footer-legal a { color: rgba(255, 253, 248, .5); text-decoration: none; transition: color .3s ease; }
+.footer-legal a:hover { color: var(--gold); }
 
 /* Shared About and Contact page content */
 main:has(.page-content) { min-height: calc(100vh - 70px); }
 .page-content { margin: 0 auto; max-width: 760px; min-height: calc(100vh - 170px); padding: 150px 32px 100px; }
+.page-hero + .page-content { padding-top: 80px; }
 .page-content h1 { font-size: clamp(2.5rem, 5vw, 4rem); margin-bottom: 32px; }
 .page-content .lead, .page-section p { color: var(--ink-soft); line-height: 1.9; }
 .page-content .lead { font-size: 1.1rem; margin-bottom: 64px; }
@@ -123,6 +195,35 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
 .page-section h2 { color: var(--clay); font-size: 1.55rem; margin-bottom: 20px; }
 .page-section p { font-size: 1rem; margin-bottom: 18px; }
 .contact-detail { color: var(--clay) !important; font-size: 1.1rem !important; letter-spacing: 1px; }
+
+.contact-form { display: grid; gap: 24px; margin-top: 12px; max-width: 560px; }
+.form-row { display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
+.contact-form label { color: var(--ink-soft); display: block; font-size: .7rem; letter-spacing: 1.2px; text-transform: uppercase; }
+.contact-form input, .contact-form textarea { background: transparent; border: 0; border-bottom: 1px solid rgba(30, 32, 28, .25); color: var(--ink); font-family: 'Jost', sans-serif; font-size: 1rem; margin-top: 10px; padding: 10px 2px; transition: border-color .3s ease; width: 100%; }
+.contact-form input:focus, .contact-form textarea:focus { border-color: var(--clay); outline: 0; }
+.contact-form textarea { resize: vertical; }
+.contact-form button { justify-self: start; margin-top: 8px; border: 0; cursor: pointer; }
+@media (max-width: 760px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+/* Shop gallery pages (Bracelets, Rudraksha, Chains) */
+.shop-page { max-width: 1200px; }
+.shop-grid { display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr); margin: 40px 0 60px; }
+.shop-item { border-radius: 16px; box-shadow: 0 18px 34px rgba(30, 32, 28, .18); display: block; overflow: hidden; }
+.shop-item img { border-radius: 16px; display: block; height: 340px; object-fit: cover; transition: transform .5s ease; width: 100%; }
+.shop-item:hover img { transform: scale(1.05); }
+.shop-item { cursor: zoom-in; }
+
+.lightbox { align-items: center; background: rgba(20, 20, 16, .9); display: flex; inset: 0; justify-content: center; opacity: 0; padding: 6vh 6vw; pointer-events: none; position: fixed; transition: opacity .3s ease; z-index: 1000; }
+.lightbox.is-open { opacity: 1; pointer-events: auto; }
+.lightbox img { border-radius: 12px; box-shadow: 0 30px 70px rgba(0, 0, 0, .5); max-height: 86vh; max-width: min(880px, 90vw); transform: scale(.82); transition: transform .4s cubic-bezier(.34, 1.56, .64, 1); }
+.lightbox.is-open img { transform: scale(1); }
+.lightbox-close { background: rgba(255, 253, 248, .12); border: 0; border-radius: 50%; color: var(--white); cursor: pointer; font-size: 1.6rem; height: 42px; line-height: 1; position: absolute; right: 24px; top: 20px; width: 42px; }
+.lightbox-close:hover { background: rgba(255, 253, 248, .22); }
+@media (max-width: 760px) {
+  .lightbox-close { right: 14px; top: 14px; }
+}
 
 @media (max-width: 760px) {
   header { display: flex; padding: 18px 5vw; position: absolute; }
@@ -143,9 +244,22 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
   .category-grid, .product-grid, .journal-grid { grid-template-columns: 1fr; }
   .category-card { height: 390px; }
   .zodiac, .promise { display: block; padding-left: 7vw; padding-right: 7vw; }
-  .zodiac-wheel { margin: 60px auto 0; max-width: 360px; padding: 35px; }
+  .zodiac-wheel { --zw-radius: 145px; margin: 60px auto 0; max-width: 400px; }
+  .zodiac-sign i { font-size: .62rem; }
+  .zodiac-sign i::before { font-size: 1.5rem; }
   .promise-list { gap: 28px; grid-template-columns: 1fr; margin-top: 55px; }
   .promise-list h3 { margin-top: 22px; }
   .product-image { height: 370px; }
   .closing-cta { padding: 90px 7vw; }
+  .shop-circles { padding: 38px 7vw 6px; }
+  .circle-row { flex-wrap: nowrap; gap: 24px; justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
+  .circle-ring { flex-shrink: 0; }
+  .circle-thumb { height: 72px; width: 72px; }
+  .scroll-showcase { padding: 60px 0 90px; }
+  .scroll-track a { height: 220px; width: 160px; }
+  .shop-grid { gap: 14px; grid-template-columns: 1fr 1fr; }
+  .shop-item img { height: 220px; }
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 40px; }
+  .footer-brand { grid-column: 1 / -1; }
+  .footer-bottom { flex-direction: column; align-items: flex-start; text-align: left; }
 }

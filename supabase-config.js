@@ -1,0 +1,2 @@
+window.SUPABASE_URL = 'https://acnhzuiisexsiuondawt.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjbmh6dWlpc2V4c2l1b25kYXd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2ODc0NDEsImV4cCI6MjEwNjI2MzQ0MX0.gGTZ_yIRFmogjXOaxEXHDavFzm0PjAoa9kmxZV8o7O0';

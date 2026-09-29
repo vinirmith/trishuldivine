@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout | Trishul Divine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="checkout-page">
+  <header>
+    <a href="index.html" class="logo">Trishuldivine</a>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="bracelets.html">Bracelets</a></li>
+        <li><a href="rudraksha.html">Rudraksha</a></li>
+        <li><a href="chains.html">Chains</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a class="header-whatsapp" href="https://wa.me/919999999999" target="_blank" rel="noopener">WhatsApp us</a>
+    </div>
+  </header>
+
+  <main class="checkout-shell">
+    <section class="checkout-layout">
+      <div class="checkout-panel">
+        <p class="eyebrow">Secure checkout</p>
+        <h1>Delivery details</h1>
+
+        <div id="checkoutSuccess" class="checkout-success" hidden>
+          <p class="eyebrow success-label">Order placed</p>
+          <h2>Your order has been received.</h2>
+          <p>We will contact you soon on your phone or email to confirm dispatch.</p>
+          <a href="index.html" class="button button-gold">Continue shopping</a>
+        </div>
+
+        <form id="checkoutForm" class="checkout-form-page">
+          <div class="field-grid two-col">
+            <label class="field">
+              <span>Full name</span>
+              <input type="text" name="full_name" placeholder="Your full name" required />
+            </label>
+            <label class="field">
+              <span>Phone</span>
+              <input type="tel" name="phone" placeholder="98765 43210" required />
+            </label>
+          </div>
+
+          <div class="field-grid two-col">
+            <label class="field">
+              <span>Email</span>
+              <input type="email" name="email" placeholder="you@example.com" required />
+            </label>
+            <label class="field">
+              <span>Country</span>
+              <input type="text" name="country" value="India" required />
+            </label>
+          </div>
+
+          <div class="field-grid three-col">
+            <label class="field">
+              <span>State</span>
+              <input type="text" name="state" placeholder="State" required />
+            </label>
+            <label class="field">
+              <span>City</span>
+              <input type="text" name="city" placeholder="City" required />
+            </label>
+            <label class="field">
+              <span>Pincode</span>
+              <input type="text" name="pincode" placeholder="500001" required />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Address</span>
+            <textarea name="address" rows="4" placeholder="House number, street, landmark" required></textarea>
+          </label>
+
+          <label class="field">
+            <span>Order notes (optional)</span>
+            <textarea name="notes" rows="3" placeholder="Any instructions for delivery"></textarea>
+          </label>
+
+          <button id="payNowButton" class="button button-gold" type="submit">Pay now</button>
+        </form>
+      </div>
+
+      <aside class="checkout-summary-card">
+        <p class="eyebrow">Order summary</p>
+        <div id="checkoutCartItems" class="checkout-items" hidden></div>
+        <div id="checkoutEmpty" class="checkout-empty">Your cart is empty.</div>
+
+        <div class="checkout-total-row">
+          <span>Total</span>
+          <strong id="checkoutTotal">₹0</strong>
+        </div>
+
+        <div id="checkoutUserSummary" class="checkout-user-summary">Checking account...</div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

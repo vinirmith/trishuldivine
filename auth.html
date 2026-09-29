@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | Trishul Divine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-page">
+  <header>
+    <a href="index.html" class="logo">Trishuldivine</a>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="bracelets.html">Bracelets</a></li>
+        <li><a href="rudraksha.html">Rudraksha</a></li>
+        <li><a href="chains.html">Chains</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <a class="header-whatsapp" href="https://wa.me/919999999999" target="_blank" rel="noopener">WhatsApp us</a>
+    </div>
+  </header>
+
+  <main class="auth-shell">
+    <section class="auth-hero">
+      <p class="eyebrow">Secure account access</p>
+      <h1>Build your<br><em>Trishul Divine</em><br>account.</h1>
+      <p>Your orders, saved details, and checkout history stay connected to your account.</p>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-card">
+        <div class="auth-header">
+          <p class="eyebrow">Welcome</p>
+          <h2>Login to continue</h2>
+        </div>
+
+        <form id="authForm" class="auth-form">
+          <input type="hidden" id="authMode" value="login" />
+
+          <label id="fullNameField" class="field" hidden>
+            <span>Full name</span>
+            <input type="text" name="full_name" placeholder="Your full name" />
+          </label>
+
+          <label class="field">
+            <span>Email address</span>
+            <input type="email" name="email" placeholder="you@example.com" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter password" required />
+          </label>
+
+          <button type="submit" class="button button-gold">Log in</button>
+        </form>
+
+        <div class="auth-divider"><span>or continue with</span></div>
+        <button id="googleLoginButton" type="button" class="button button-secondary auth-google-button">
+          <span class="google-g">G</span>
+          <span>Google</span>
+        </button>
+
+        <button type="button" class="text-button" data-auth-mode>Need an account? Sign up</button>
+        <p id="authMessage" class="auth-message" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -431,6 +431,7 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
 .shop-product-image { border-radius: 16px; box-shadow: 0 18px 34px rgba(30, 32, 28, .18); display: block; height: 340px; object-fit: cover; overflow: hidden; width: 100%; }
 .shop-product-meta { padding-top: 14px; }
 .shop-product-meta h3 { font-size: 1.05rem; line-height: 1.4; }
+.shop-product-desc { color: var(--ink-soft); font-size: .82rem; line-height: 1.6; margin-top: 6px; }
 .shop-product-price { color: var(--clay); font-size: .95rem; font-weight: 500; margin-top: 6px; }
 .shop-product-sizes { color: var(--ink-soft); font-size: .72rem; letter-spacing: .3px; margin-top: 4px; }
 .shop-product-card.is-out-of-stock .shop-product-image { filter: grayscale(.45); opacity: .75; }

@@ -19,7 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   };
 
+  let supabaseClient = null;
   const getSupabaseClient = () => {
+    if (supabaseClient) return supabaseClient;
     const url = window.SUPABASE_URL;
     const key = window.SUPABASE_ANON_KEY;
 
@@ -27,7 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
 
-    return window.supabase ? window.supabase.createClient(url, key) : null;
+    supabaseClient = window.supabase ? window.supabase.createClient(url, key) : null;
+    return supabaseClient;
+  };
+
+  const withRetry = async (run, attempts = 3) => {
+    let result;
+    for (let i = 0; i < attempts; i += 1) {
+      try {
+        result = await run();
+        if (!result.error) return result;
+      } catch (err) {
+        result = { data: null, error: err };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600 * (i + 1)));
+    }
+    return result;
   };
 
   const sanitizeName = (value) => value.replace(/\s+/g, ' ').trim();
@@ -433,12 +450,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const sizes = Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(' · ') : '';
 
     const name = sanitizeName(product.name || 'Product');
+    const description = (product.description || '').trim();
     const card = document.createElement('article');
     card.className = 'shop-product-card' + (inStock ? '' : ' is-out-of-stock');
     card.innerHTML = `
       <img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}">
       <div class="shop-product-meta">
         <h3>${escapeHtml(name)}</h3>
+        ${description ? `<p class="shop-product-desc">${escapeHtml(description)}</p>` : ''}
         <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
         ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}
         ${inStock
@@ -460,11 +479,11 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       return;
     }
 
-    const { data, error } = await client
+    const { data, error } = await withRetry(() => client
       .from('products')
       .select('*')
       .eq('category', category)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }));
 
     if (error) {
       console.error('Failed to load products:', error);
@@ -488,15 +507,16 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const client = getSupabaseClient();
     if (!client) return;
 
-    const { data, error } = await client
+    const { data, error } = await withRetry(() => client
       .from('products')
       .select('*')
       .eq('in_stock', true)
       .order('created_at', { ascending: false })
-      .limit(3);
+      .limit(3));
 
     if (error) {
       console.error('Failed to load featured products:', error);
+      grid.innerHTML = '<p class="featured-empty">Could not load products right now. Please refresh.</p>';
       return;
     }
 

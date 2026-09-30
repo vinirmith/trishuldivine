@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const client = getSupabaseClient();
+  const allowedAdminEmails = Array.isArray(window.ADMIN_ALLOWED_EMAILS)
+    ? window.ADMIN_ALLOWED_EMAILS.map((email) => String(email || '').trim().toLowerCase())
+    : [];
 
   const loginSection = document.getElementById('adminLogin');
   const deniedSection = document.getElementById('adminDenied');
@@ -43,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!client) {
     if (loginMessage) loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in supabase-config.js.';
-    return;
   }
 
   let allProducts = [];
@@ -55,6 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
+
+  const isAllowedAdminEmail = (email) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    return normalizedEmail && allowedAdminEmails.includes(normalizedEmail);
+  };
 
   const showOnly = (section) => {
     [loginSection, deniedSection, dashboardSection].forEach((el) => {
@@ -264,9 +271,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const checkAccess = async () => {
+    if (!client) {
+      showOnly(loginSection);
+      return;
+    }
+
     const { data: { session } } = await client.auth.getSession();
     if (!session) {
       showOnly(loginSection);
+      return;
+    }
+
+    const signedInEmail = (session.user?.email || '').trim().toLowerCase();
+    const emailAllowed = isAllowedAdminEmail(signedInEmail);
+
+    if (emailAllowed) {
+      showOnly(dashboardSection);
+      await loadProducts();
       return;
     }
 
@@ -291,17 +312,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const password = loginForm.querySelector('[name="password"]').value;
     loginMessage.textContent = 'Signing in…';
 
+    if (!client) {
+      loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in supabase-config.js.';
+      return;
+    }
+
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) {
       loginMessage.textContent = error.message || 'Login failed.';
       return;
     }
+
+    const signedInEmail = email.trim().toLowerCase();
+    if (!isAllowedAdminEmail(signedInEmail)) {
+      const { error: signOutError } = await client.auth.signOut();
+      if (signOutError) console.error('Admin sign-out after deny failed:', signOutError);
+      loginMessage.textContent = 'This account is not in the approved admin allowlist.';
+      showOnly(deniedSection);
+      return;
+    }
+
     loginMessage.textContent = '';
     await checkAccess();
   });
 
   const doLogout = async () => {
-    await client.auth.signOut();
+    if (client) {
+      await client.auth.signOut();
+    }
     await checkAccess();
   };
   logoutButton.addEventListener('click', doLogout);

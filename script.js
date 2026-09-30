@@ -445,7 +445,8 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
   };
 
   const renderShopProductCard = (product) => {
-    const image = (product.images && product.images[0]) || 'images/gemstone_beads.jpeg';
+    const rawImage = (product.images && product.images[0]) || 'images/gemstone_beads.jpeg';
+    const image = rawImage.replace(/^https:\/\/[a-z0-9]+\.supabase\.co/, window.SUPABASE_URL || '');
     const inStock = product.in_stock !== false;
     const sizes = Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(' · ') : '';
 

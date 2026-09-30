@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const sanitizeName = (value) => value.replace(/\s+/g, ' ').trim();
 
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[char]));
+
   const goToCheckout = async () => {
     window.location.href = 'checkout.html';
   };
@@ -423,6 +427,88 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     });
   };
 
+  const renderShopProductCard = (product) => {
+    const image = (product.images && product.images[0]) || 'images/gemstone_beads.jpeg';
+    const inStock = product.in_stock !== false;
+    const sizes = Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(' · ') : '';
+
+    const name = sanitizeName(product.name || 'Product');
+    const card = document.createElement('article');
+    card.className = 'shop-product-card' + (inStock ? '' : ' is-out-of-stock');
+    card.innerHTML = `
+      <img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}">
+      <div class="shop-product-meta">
+        <h3>${escapeHtml(name)}</h3>
+        <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
+        ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}
+        ${inStock
+          ? `<button type="button" class="add-to-cart" data-name="${escapeHtml(name)}" data-image="${escapeHtml(image)}" data-price="${product.price || 0}">Add to cart</button>`
+          : `<span class="out-of-stock-badge">Out of stock</span>`}
+      </div>
+    `;
+    return card;
+  };
+
+  const loadShopProducts = async () => {
+    const grid = document.querySelector('.shop-grid[data-shop-category]');
+    if (!grid) return;
+
+    const category = grid.getAttribute('data-shop-category');
+    const client = getSupabaseClient();
+    if (!client) {
+      grid.innerHTML = '<p class="shop-empty">Supabase is not configured yet.</p>';
+      return;
+    }
+
+    const { data, error } = await client
+      .from('products')
+      .select('*')
+      .eq('category', category)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load products:', error);
+      grid.innerHTML = '<p class="shop-empty">Could not load products right now.</p>';
+      return;
+    }
+
+    if (!data || !data.length) {
+      grid.innerHTML = '<p class="shop-empty">New arrivals coming soon.</p>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    data.forEach((product) => grid.appendChild(renderShopProductCard(product)));
+  };
+
+  const loadFeaturedProducts = async () => {
+    const grid = document.querySelector('.product-grid[data-featured]');
+    if (!grid) return;
+
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    const { data, error } = await client
+      .from('products')
+      .select('*')
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (error) {
+      console.error('Failed to load featured products:', error);
+      return;
+    }
+
+    if (!data || !data.length) {
+      grid.innerHTML = '<p class="featured-empty">New arrivals coming soon.</p>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    data.forEach((product) => grid.appendChild(renderShopProductCard(product)));
+  };
+
   document.addEventListener('click', (event) => {
     const cartToggle = event.target.closest('.cart-button');
     if (cartToggle) {
@@ -439,9 +525,11 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const addButton = event.target.closest('.add-to-cart');
     if (addButton) {
       event.preventDefault();
+      if (addButton.disabled) return;
       addToCart({
         name: addButton.dataset.name || 'Product',
         image: addButton.dataset.image || 'images/gemstone_beads.jpeg',
+        unitPrice: addButton.dataset.price,
       });
       return;
     }
@@ -510,6 +598,8 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     createCartPanel();
     injectAddToCartButtons();
     renderCart();
+    loadShopProducts();
+    loadFeaturedProducts();
   }
   renderAuthButton();
 

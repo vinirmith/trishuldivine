@@ -192,12 +192,41 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('cart-open');
   };
 
+  const MAX_IMAGE_SIDE = 1200;
+  const IMAGE_QUALITY = 0.82;
+
+  // Shrinks big photos in the browser before upload. Falls back to the original
+  // file if the browser can't decode it (e.g. HEIC) or the result isn't smaller.
+  const resizeImage = async (file) => {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', IMAGE_QUALITY));
+      if (!blob || blob.size >= file.size) return file;
+      const name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+      return new File([blob], name, { type: 'image/jpeg' });
+    } catch (err) {
+      console.warn('Could not resize image, uploading original:', err);
+      return file;
+    }
+  };
+
   const uploadStagedImages = async () => {
     const uploaded = [];
-    for (const file of newImageFiles) {
+    for (const original of newImageFiles) {
+      formMessage.textContent = 'Optimising images…';
+      const file = await resizeImage(original);
       const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
       const path = `${crypto.randomUUID()}-${safeName}`;
-      const { error } = await client.storage.from('product-images').upload(path, file, { cacheControl: '3600', upsert: false });
+      const { error } = await client.storage.from('product-images').upload(path, file, { cacheControl: '31536000', upsert: false });
       if (error) throw error;
       const { data } = client.storage.from('product-images').getPublicUrl(path);
       uploaded.push(data.publicUrl);

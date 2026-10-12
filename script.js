@@ -455,9 +455,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const card = document.createElement('article');
     card.className = 'shop-product-card' + (inStock ? '' : ' is-out-of-stock');
     card.innerHTML = `
-      <img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}">
+      <a href="product.html?id=${encodeURIComponent(product.id)}" aria-label="View ${escapeHtml(name)}"><img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}"></a>
       <div class="shop-product-meta">
-        <h3>${escapeHtml(name)}</h3>
+        <h3><a href="product.html?id=${encodeURIComponent(product.id)}">${escapeHtml(name)}</a></h3>
         ${description ? `<p class="shop-product-desc">${escapeHtml(description)}</p>` : ''}
         <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
         ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}

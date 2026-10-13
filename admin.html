@@ -131,7 +131,11 @@
 
         <label class="field">
           <span>Description</span>
-          <textarea id="fieldDescription" name="description" rows="4" placeholder="Short product description"></textarea>
+          <div class="desc-toolbar" role="toolbar" aria-label="Description formatting">
+            <button type="button" id="descBold" title="Bold (select text first)"><b>B</b></button>
+            <button type="button" id="descBullet" title="Bullet list (applies to selected lines)">&bull; List</button>
+          </div>
+          <textarea id="fieldDescription" name="description" rows="8" placeholder="Product description. Use B for bold and List for bullet points."></textarea>
         </label>
 
         <label class="field">

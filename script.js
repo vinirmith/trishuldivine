@@ -57,70 +57,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'checkout.html';
   };
 
-  const renderAuthButton = async () => {
-    const header = document.querySelector('header');
-    if (!header || isAuthPage) return;
+  const createCartBar = () => {
+    if (!isStorePage || document.querySelector('.cart-bar')) return;
 
-    if (!isStorePage) return;
-
-    let actionGroup = header.querySelector('.header-actions');
-    if (!actionGroup) {
-      actionGroup = document.createElement('div');
-      actionGroup.className = 'header-actions';
-      const whatsapp = header.querySelector('.header-whatsapp');
-      if (whatsapp) {
-        header.insertBefore(actionGroup, whatsapp);
-      } else {
-        header.appendChild(actionGroup);
-      }
-    }
-
-    let authButton = header.querySelector('.auth-button');
-    if (!authButton) {
-      authButton = document.createElement('button');
-      authButton.type = 'button';
-      authButton.className = 'auth-button';
-      authButton.innerHTML = '<span>Checkout</span>';
-      authButton.setAttribute('aria-label', 'Checkout');
-      actionGroup.appendChild(authButton);
-    }
-
-    authButton.innerHTML = '<span>Checkout</span>';
-    authButton.classList.remove('is-logged-in');
-    authButton.onclick = () => window.location.href = 'checkout.html';
-  };
-
-  const createCartButton = () => {
-    if (!isStorePage) return;
-
-    const header = document.querySelector('header');
-    if (!header || header.querySelector('.cart-button')) return;
-
-    const cartButton = document.createElement('button');
-    cartButton.type = 'button';
-    cartButton.className = 'cart-button';
-    cartButton.setAttribute('aria-label', 'View cart');
-    cartButton.innerHTML = '<span>Cart</span><span class="cart-count">0</span>';
-
-    let actionGroup = header.querySelector('.header-actions');
-    const whatsapp = header.querySelector('.header-whatsapp');
-
-    if (!actionGroup) {
-      actionGroup = document.createElement('div');
-      actionGroup.className = 'header-actions';
-
-      if (whatsapp) {
-        header.insertBefore(actionGroup, whatsapp);
-      } else {
-        header.appendChild(actionGroup);
-      }
-    }
-
-    actionGroup.appendChild(cartButton);
-
-    if (whatsapp && whatsapp.parentElement !== actionGroup) {
-      actionGroup.appendChild(whatsapp);
-    }
+    const bar = document.createElement('div');
+    bar.className = 'cart-bar';
+    bar.hidden = true;
+    bar.innerHTML = `
+      <div class="cart-bar-info"><span class="cart-count">0</span><span class="cart-bar-text">items</span><strong class="cart-bar-total"></strong></div>
+      <div class="cart-bar-actions">
+        <button type="button" class="cart-button" aria-label="View cart">View cart</button>
+        <a class="cart-bar-checkout" href="checkout.html">Checkout</a>
+      </div>`;
+    document.body.appendChild(bar);
   };
 
   const openCart = () => {
@@ -186,6 +135,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemCount = items.reduce((total, item) => total + (Number(item.quantity) || 1), 0);
     const cartCount = document.querySelector('.cart-count');
     if (cartCount) cartCount.textContent = String(itemCount);
+    const bar = document.querySelector('.cart-bar');
+    if (bar) {
+      const total = items.reduce((sum, item) => sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 1), 0);
+      bar.hidden = itemCount === 0;
+      document.body.classList.toggle('has-cart-bar', itemCount > 0);
+      bar.querySelector('.cart-bar-text').textContent = itemCount === 1 ? 'item' : 'items';
+      bar.querySelector('.cart-bar-total').textContent = total ? `₹${total.toLocaleString('en-IN')}` : '';
+    }
 
     const panel = document.getElementById('cartPanel');
     if (!panel) return;
@@ -253,7 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveCart(items);
     renderCart();
-    openCart();
   };
 
   const submitOrderToSupabase = async (customerData) => {
@@ -451,14 +407,12 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const sizes = Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(' · ') : '';
 
     const name = sanitizeName(product.name || 'Product');
-    const description = (product.description || '').trim();
     const card = document.createElement('article');
     card.className = 'shop-product-card' + (inStock ? '' : ' is-out-of-stock');
     card.innerHTML = `
       <a href="product.html?id=${encodeURIComponent(product.id)}" aria-label="View ${escapeHtml(name)}"><img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}"></a>
       <div class="shop-product-meta">
         <h3><a href="product.html?id=${encodeURIComponent(product.id)}">${escapeHtml(name)}</a></h3>
-        ${description ? `<p class="shop-product-desc">${escapeHtml(description)}</p>` : ''}
         <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
         ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}
         ${inStock
@@ -615,14 +569,13 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
 
   setActiveNav();
   if (isStorePage) {
-    createCartButton();
+    createCartBar();
     createCartPanel();
     injectAddToCartButtons();
     renderCart();
     loadShopProducts();
     loadFeaturedProducts();
   }
-  renderAuthButton();
 
   const video = document.getElementById('bgVideo');
   const overlay = document.getElementById('enterOverlay');

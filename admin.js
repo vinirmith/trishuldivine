@@ -38,6 +38,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldPrice = document.getElementById('fieldPrice');
   const fieldCategory = document.getElementById('fieldCategory');
   const fieldDescription = document.getElementById('fieldDescription');
+
+  // Descriptions use light markup: **bold** and "- " bullet lines (rendered on the product page).
+  document.getElementById('descBold').addEventListener('click', () => {
+    const { selectionStart: start, selectionEnd: end, value } = fieldDescription;
+    const selected = value.slice(start, end) || 'bold text';
+    fieldDescription.setRangeText(`**${selected}**`, start, end, 'select');
+    fieldDescription.focus();
+  });
+  document.getElementById('descBullet').addEventListener('click', () => {
+    const { selectionStart, selectionEnd, value } = fieldDescription;
+    const start = value.lastIndexOf('\n', selectionStart - 1) + 1;
+    const nextBreak = value.indexOf('\n', selectionEnd);
+    const end = nextBreak === -1 ? value.length : nextBreak;
+    const lines = value.slice(start, end).split('\n');
+    const allBulleted = lines.every((line) => /^\s*-\s/.test(line));
+    const next = lines.map((line) => (allBulleted ? line.replace(/^\s*-\s/, '') : (/^\s*-\s/.test(line) ? line : `- ${line}`))).join('\n');
+    fieldDescription.setRangeText(next, start, end, 'select');
+    fieldDescription.focus();
+  });
   const fieldSizes = document.getElementById('fieldSizes');
   const fieldImageFiles = document.getElementById('fieldImageFiles');
   const imagePreview = document.getElementById('adminImagePreview');

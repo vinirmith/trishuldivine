@@ -7,6 +7,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
+  // Description markup from the admin: blank line = paragraph, "- " lines = bullets, **text** = bold.
+  const inline = (text) => escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const formatDescription = (text) => {
+    const html = [];
+    let list = [];
+    let para = [];
+    const flushList = () => { if (list.length) html.push(`<ul>${list.join('')}</ul>`); list = []; };
+    const flushPara = () => { if (para.length) html.push(`<p>${para.join('<br>')}</p>`); para = []; };
+    String(text).replace(/\r/g, '').split('\n').forEach((raw) => {
+      const line = raw.trim();
+      const bullet = line.match(/^[-*\u2022]\s+(.*)$/);
+      if (!line) { flushList(); flushPara(); }
+      else if (bullet) { flushPara(); list.push(`<li>${inline(bullet[1])}</li>`); }
+      else { flushList(); para.push(inline(line)); }
+    });
+    flushList(); flushPara();
+    return html.join('');
+  };
   const fixUrl = (url) => String(url).replace(/^https:\/\/[a-z0-9]+\.supabase\.co/, window.SUPABASE_URL || '');
   const message = (text) => { page.innerHTML = `<p class="shop-empty">${escapeHtml(text)}</p>`; };
 
@@ -67,8 +85,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${inStock
         ? '<button type="button" class="add-to-cart product-add"></button>'
         : '<span class="out-of-stock-badge">Out of stock</span>'}
-      ${product.description ? `<h2 class="product-label">About this product</h2><p class="product-desc">${escapeHtml(product.description)}</p>` : ''}
-    </div>`;
+    </div>
+    ${product.description ? `<section class="product-about"><h2 class="product-label">About this product</h2><div class="product-desc">${formatDescription(product.description)}</div></section>` : ''}`;
 
   const mainBox = page.querySelector('.product-main');
   const mainImg = page.querySelector('.product-main-image');

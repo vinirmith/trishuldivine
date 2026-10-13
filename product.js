@@ -88,6 +88,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     ${product.description ? `<section class="product-about"><h2 class="product-label">About this product</h2><div class="product-desc">${formatDescription(product.description)}</div></section>` : ''}`;
 
+  // "You may also like": three other products, same category first.
+  try {
+    const { data: others } = await client.from('products').select('*').neq('id', id).limit(50);
+    const pool = (others || []).filter((p) => p.in_stock !== false);
+    const sameCategory = pool.filter((p) => p.category === product.category);
+    const rest = pool.filter((p) => p.category !== product.category);
+    const shuffle = (list) => list.map((p) => [Math.random(), p]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    const picks = [...shuffle(sameCategory), ...shuffle(rest)].slice(0, 3);
+    if (picks.length) {
+      const section = document.createElement('section');
+      section.className = 'product-related';
+      section.innerHTML = `<h2 class="product-label">You may also like</h2><div class="related-grid">${picks.map((p) => {
+        const img = fixUrl((p.images && p.images[0]) || 'images/gemstone_beads.jpeg');
+        const pname = String(p.name || 'Product').replace(/\s+/g, ' ').trim();
+        return `<article class="shop-product-card">
+          <a href="product.html?id=${encodeURIComponent(p.id)}" aria-label="View ${escapeHtml(pname)}"><img class="shop-product-image" src="${escapeHtml(img)}" alt="${escapeHtml(pname)}"></a>
+          <div class="shop-product-meta">
+            <h3><a href="product.html?id=${encodeURIComponent(p.id)}">${escapeHtml(pname)}</a></h3>
+            <div class="shop-product-price">&#8377;${Number(p.price || 0).toLocaleString('en-IN')}</div>
+            <button type="button" class="add-to-cart" data-name="${escapeHtml(pname)}" data-image="${escapeHtml(img)}" data-price="${p.price || 0}">Add to cart</button>
+          </div>
+        </article>`;
+      }).join('')}</div>`;
+      page.appendChild(section);
+    }
+  } catch (err) { /* recommendations are optional */ }
+
   const mainBox = page.querySelector('.product-main');
   const mainImg = page.querySelector('.product-main-image');
   const lens = page.querySelector('.zoom-lens');

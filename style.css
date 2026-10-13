@@ -583,3 +583,12 @@ body.has-cart-bar { padding-bottom: 72px; }
 .hero-media video::-webkit-media-controls-overlay-play-button { -webkit-appearance: none; display: none !important; opacity: 0; }
 
 .arrow-icon { display: inline-block; flex: none; vertical-align: -.12em; }
+
+/* Product page recommendations */
+.product-related { border-top: 1px solid rgba(30, 32, 28, .1); grid-column: 1 / -1; margin-top: 10px; padding-top: 8px; }
+.product-related .product-label { margin: 20px 0 22px; }
+.related-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .related-grid { gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .related-grid .shop-product-card:nth-child(3) { display: none; }
+}

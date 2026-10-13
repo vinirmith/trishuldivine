@@ -577,6 +577,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     loadFeaturedProducts();
   }
 
+  const heroVideo = document.getElementById('bgVideo');
+  if (heroVideo) {
+    heroVideo.muted = true;
+    const tryPlay = () => { const p = heroVideo.play(); if (p && p.catch) p.catch(() => {}); };
+    tryPlay();
+    ['touchstart', 'click', 'scroll'].forEach((type) => document.addEventListener(type, () => { if (heroVideo.paused) tryPlay(); }, { once: true, passive: true }));
+  }
+
   const video = document.getElementById('bgVideo');
   const overlay = document.getElementById('enterOverlay');
   const enterButton = document.getElementById('enterButton');

@@ -574,3 +574,10 @@ body.has-cart-bar { padding-bottom: 72px; }
   .shop-product-meta .add-to-cart { align-self: stretch; font-size: .68rem; padding: 13px 10px; text-align: center; width: 100%; }
   .shop-product-meta .out-of-stock-badge { align-self: stretch; text-align: center; }
 }
+
+/* Never show the native play button on the hero video (iOS shows it when autoplay is blocked) */
+.hero-media video { pointer-events: none; }
+.hero-media video::-webkit-media-controls,
+.hero-media video::-webkit-media-controls-start-playback-button,
+.hero-media video::-webkit-media-controls-panel,
+.hero-media video::-webkit-media-controls-overlay-play-button { -webkit-appearance: none; display: none !important; opacity: 0; }

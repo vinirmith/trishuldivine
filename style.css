@@ -581,3 +581,5 @@ body.has-cart-bar { padding-bottom: 72px; }
 .hero-media video::-webkit-media-controls-start-playback-button,
 .hero-media video::-webkit-media-controls-panel,
 .hero-media video::-webkit-media-controls-overlay-play-button { -webkit-appearance: none; display: none !important; opacity: 0; }
+
+.arrow-icon { display: inline-block; flex: none; vertical-align: -.12em; }

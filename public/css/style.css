@@ -187,9 +187,9 @@ body.cart-open { overflow: hidden; }
 .add-to-cart:hover { background: var(--clay); transform: translateY(-1px); }
 .product-card .add-to-cart { margin-top: 12px; width: 100%; }
 
-.hero { background: #30382c; color: var(--white); min-height: min(640px, calc(100vh - 97px)); overflow: hidden; position: relative; }
+.hero { aspect-ratio: 16 / 9; background: #30382c; width: 100%; color: var(--white); max-height: max(420px, calc(100vh - 97px)); overflow: hidden; position: relative; }
 .hero-media, .hero-media video, .hero-shade { height: 100%; inset: 0; position: absolute; width: 100%; }
-.hero-media video { object-fit: cover; }
+.hero-media video { object-fit: contain; }
 .hero-shade { background: linear-gradient(90deg, rgba(22, 29, 21, .8), rgba(22, 29, 21, .2) 65%, rgba(22, 29, 21, .38)); }
 .hero-content { max-width: 760px; padding: 90px 8vw 100px; position: relative; z-index: 1; }
 .eyebrow { color: var(--clay); font-size: .68rem; font-weight: 500; letter-spacing: 2.8px; margin-bottom: 20px; text-transform: uppercase; }
@@ -383,9 +383,11 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
   body:has(.page-hero) nav ul a:hover, body:has(.page-hero) nav ul a.active { color: var(--clay); }
   nav li { border-bottom: 1px solid rgba(30, 32, 28, .1); padding: 15px 0; }
   nav li:last-child { border: 0; }
-  .hero { display: flex; align-items: flex-end; min-height: calc(100svh - 81px); }
-  .hero-shade { background: linear-gradient(to bottom, rgba(22, 29, 21, .55) 0, rgba(22, 29, 21, .1) 30%, rgba(22, 29, 21, .78) 62%, rgba(22, 29, 21, .94)); }
-  .hero-content { max-width: none; padding: 60px 7vw 48px; width: 100%; }
+  /* Phones: the whole 16:9 video on top, headline and button underneath it */
+  .hero { aspect-ratio: auto; max-height: none; }
+  .hero-media { aspect-ratio: 16 / 9; height: auto; inset: auto; position: relative; }
+  .hero-shade { display: none; }
+  .hero-content { max-width: none; padding: 30px 7vw 40px; width: 100%; }
   .hero h1 { font-size: clamp(2.2rem, 10vw, 3rem); }
   .hero-copy { font-size: .92rem; line-height: 1.7; margin: 18px 0 24px; }
   .hero-actions { align-items: stretch; flex-direction: column; gap: 12px; }

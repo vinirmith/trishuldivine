@@ -187,7 +187,7 @@ body.cart-open { overflow: hidden; }
 .add-to-cart:hover { background: var(--clay); transform: translateY(-1px); }
 .product-card .add-to-cart { margin-top: 12px; width: 100%; }
 
-.hero { aspect-ratio: 16 / 9; background: #30382c; width: 100%; color: var(--white); max-height: max(420px, calc(100vh - 97px)); overflow: hidden; position: relative; }
+.hero { aspect-ratio: 16 / 9; background: #30382c; width: 100%; color: var(--white); overflow: hidden; position: relative; }
 .hero-media, .hero-media video, .hero-shade { height: 100%; inset: 0; position: absolute; width: 100%; }
 .hero-media video { object-fit: contain; }
 .hero-shade { background: linear-gradient(90deg, rgba(22, 29, 21, .8), rgba(22, 29, 21, .2) 65%, rgba(22, 29, 21, .38)); }
@@ -384,7 +384,7 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
   nav li { border-bottom: 1px solid rgba(30, 32, 28, .1); padding: 15px 0; }
   nav li:last-child { border: 0; }
   /* Phones: the whole 16:9 video on top, headline and button underneath it */
-  .hero { aspect-ratio: auto; max-height: none; }
+  .hero { aspect-ratio: auto; }
   .hero-media { aspect-ratio: 16 / 9; height: auto; inset: auto; position: relative; }
   .hero-shade { display: none; }
   .hero-content { max-width: none; padding: 30px 7vw 40px; width: 100%; }

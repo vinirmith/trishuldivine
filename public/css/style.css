@@ -209,18 +209,18 @@ em { color: var(--clay); font-style: normal; }
 
 .shop-circles { margin: 0 auto; max-width: 1240px; padding: 54px 5vw 10px; text-align: center; }
 .circle-row-eyebrow { color: var(--clay); font-size: .68rem; font-weight: 500; letter-spacing: 2.6px; margin-bottom: 26px; text-transform: uppercase; }
-.circle-row { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
+.circle-row { display: flex; flex-wrap: wrap; gap: 64px; justify-content: center; }
 .circle-item { align-items: center; animation: circle-pop .6s cubic-bezier(.34, 1.56, .64, 1) both; display: flex; flex-direction: column; gap: 13px; text-decoration: none; }
 .circle-item:nth-child(1) { animation-delay: .05s; }
 .circle-item:nth-child(2) { animation-delay: .15s; }
 .circle-item:nth-child(3) { animation-delay: .25s; }
 .circle-item:nth-child(4) { animation-delay: .35s; }
 .circle-ring { background: conic-gradient(from 180deg, var(--gold), var(--clay), var(--gold)); border-radius: 50%; display: inline-flex; padding: 3px; transition: transform .4s cubic-bezier(.34, 1.56, .64, 1), box-shadow .4s ease; }
-.circle-thumb { background: var(--paper); border-radius: 50%; box-shadow: 0 10px 24px rgba(30, 32, 28, .18); display: block; height: 92px; overflow: hidden; padding: 3px; width: 92px; }
+.circle-thumb { background: var(--paper); border-radius: 50%; box-shadow: 0 10px 24px rgba(30, 32, 28, .18); display: block; height: 150px; overflow: hidden; padding: 4px; width: 150px; }
 .circle-thumb img { border-radius: 50%; display: block; height: 100%; object-fit: cover; width: 100%; }
 .circle-item:hover .circle-ring { box-shadow: 0 14px 28px rgba(198, 164, 103, .35); transform: scale(1.08) rotate(6deg); }
 .circle-item:active .circle-ring { transform: scale(.95); }
-.circle-label { color: var(--ink-soft); font-size: .72rem; letter-spacing: 1.2px; text-transform: uppercase; transition: color .3s ease; }
+.circle-label { color: var(--ink-soft); font-size: .85rem; font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; transition: color .3s ease; }
 .circle-item:hover .circle-label { color: var(--clay); }
 @keyframes circle-pop { from { opacity: 0; transform: translateY(16px) scale(.85); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) {
@@ -408,9 +408,11 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
   .product-image { height: 370px; }
   .closing-cta { padding: 90px 7vw; }
   .shop-circles { padding: 38px 7vw 6px; }
-  .circle-row { flex-wrap: nowrap; gap: 24px; justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
+  /* centred as a block; if the screen is too narrow for all circles it scrolls sideways instead of overflowing */
+  .circle-row { flex-wrap: nowrap; gap: clamp(8px, 3.5vw, 22px); justify-content: flex-start; margin: 0 auto; max-width: 100%; overflow-x: auto; padding: 4px 8px 18px; width: max-content; }
   .circle-ring { flex-shrink: 0; }
-  .circle-thumb { height: 72px; width: 72px; }
+  .circle-thumb { height: clamp(62px, 22vw, 88px); width: clamp(62px, 22vw, 88px); }
+  .circle-label { font-size: .7rem; letter-spacing: .9px; }
   .scroll-showcase { padding: 60px 0 90px; }
   .scroll-track a { height: 220px; width: 160px; }
   .shop-grid { gap: 14px; grid-template-columns: 1fr 1fr; }

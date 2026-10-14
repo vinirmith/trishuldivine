@@ -5,5 +5,19 @@
   "assets": {
     "directory": ".",
     "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  // Non-secret settings. Secrets (never put these here) are set with `wrangler secret put`:
+  //   SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
+  //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY
+  // See PAYMENTS_SETUP.md.
+  "vars": {
+    "SUPABASE_URL": "https://acnhzuiisexsiuondawt.supabase.co",
+    "SITE_URL": "https://trishuldivine.com",
+    // Must be an address on a domain you have verified in Resend.
+    "EMAIL_FROM": "Trishul Divine <orders@trishuldivine.com>",
+    "SUPPORT_EMAIL": "Trishuldevine@gmail.com",
+    // Comma-separated. These addresses get an email for every new paid order.
+    "ADMIN_NOTIFY_EMAIL": ""
   }
 }

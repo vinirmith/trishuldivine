@@ -102,12 +102,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       section.innerHTML = `<h2 class="product-label">You may also like</h2><div class="related-grid">${picks.map((p) => {
         const img = fixUrl((p.images && p.images[0]) || 'images/gemstone_beads.jpeg');
         const pname = String(p.name || 'Product').replace(/\s+/g, ' ').trim();
+        const psizes = Array.isArray(p.sizes) ? p.sizes : [];
+        const pbutton = psizes.length > 1
+          ? `<button type="button" class="add-to-cart" data-href="product.html?id=${encodeURIComponent(p.id)}">Select size</button>`
+          : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(p.id)}" data-size="${escapeHtml(psizes[0] || '')}" data-name="${escapeHtml(pname)}" data-image="${escapeHtml(img)}" data-price="${p.price || 0}">Add to cart</button>`;
         return `<article class="shop-product-card">
           <a href="product.html?id=${encodeURIComponent(p.id)}" aria-label="View ${escapeHtml(pname)}"><img class="shop-product-image" src="${escapeHtml(img)}" alt="${escapeHtml(pname)}"></a>
           <div class="shop-product-meta">
             <h3><a href="product.html?id=${encodeURIComponent(p.id)}">${escapeHtml(pname)}</a></h3>
             <div class="shop-product-price">&#8377;${Number(p.price || 0).toLocaleString('en-IN')}</div>
-            <button type="button" class="add-to-cart" data-name="${escapeHtml(pname)}" data-image="${escapeHtml(img)}" data-price="${p.price || 0}">Add to cart</button>
+            ${pbutton}
           </div>
         </article>`;
       }).join('')}</div>`;
@@ -124,8 +128,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const syncAddButton = () => {
     if (!addButton) return;
     addButton.textContent = 'Add to cart';
-    // The cart is keyed by name, so each size becomes its own cart line.
-    addButton.dataset.name = size ? `${name} (${size})` : name;
+    // The cart keys each line by product id + size and the server re-prices it at checkout.
+    addButton.dataset.productId = product.id;
+    addButton.dataset.name = name;
+    addButton.dataset.size = size;
     addButton.dataset.image = images[0];
     addButton.dataset.price = String(price);
   };
@@ -156,21 +162,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const hideZoom = () => { lens.hidden = true; pane.hidden = true; };
   const moveZoom = (event) => {
     const box = mainBox.getBoundingClientRect();
+    // The image is letterboxed inside the box (object-fit: contain); zoom only over the drawn image.
+    const naturalW = mainImg.naturalWidth || box.width;
+    const naturalH = mainImg.naturalHeight || box.height;
+    const fit = Math.min(box.width / naturalW, box.height / naturalH);
+    const imgW = naturalW * fit;
+    const imgH = naturalH * fit;
+    const offX = (box.width - imgW) / 2;
+    const offY = (box.height - imgH) / 2;
     const paneW = box.width * PANE_SCALE;
     const paneH = box.height * PANE_SCALE;
-    const lensW = paneW / ZOOM;
-    const lensH = paneH / ZOOM;
-    const x = Math.min(Math.max(event.clientX - box.left - lensW / 2, 0), box.width - lensW);
-    const y = Math.min(Math.max(event.clientY - box.top - lensH / 2, 0), box.height - lensH);
+    const lensW = Math.min(paneW / ZOOM, imgW);
+    const lensH = Math.min(paneH / ZOOM, imgH);
+    const x = Math.min(Math.max(event.clientX - box.left - lensW / 2, offX), offX + imgW - lensW);
+    const y = Math.min(Math.max(event.clientY - box.top - lensH / 2, offY), offY + imgH - lensH);
 
     lens.style.cssText = `width:${lensW}px;height:${lensH}px;left:${x}px;top:${y}px`;
     lens.hidden = false;
 
     const paneBox = page.querySelector('.product-info').getBoundingClientRect();
     pane.style.cssText = `width:${paneW}px;height:${paneH}px;left:0;top:${box.top - paneBox.top}px;`
-      + `background-image:url("${images[current].replace(/"/g, '%22')}");`
-      + `background-size:${box.width * ZOOM}px ${box.height * ZOOM}px;`
-      + `background-position:${-x * ZOOM}px ${-y * ZOOM}px`;
+      + `background-image:url("${images[current].replace(/"/g, '%22')}");background-repeat:no-repeat;`
+      + `background-size:${imgW * ZOOM}px ${imgH * ZOOM}px;`
+      + `background-position:${-(x - offX) * ZOOM}px ${-(y - offY) * ZOOM}px`;
     pane.hidden = false;
   };
 

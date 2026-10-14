@@ -13,7 +13,7 @@
 <body class="admin-page">
 
   <header class="admin-header">
-    <a href="index.html" class="logo">Trishuldivine</a>
+    <a href="index.html" class="logo" aria-label="Trishul Divine home"><span class="logo-crop"><img src="logo.jpeg" alt="Trishul Divine"></span></a>
     <span class="admin-header-title">Admin</span>
     <div class="header-actions">
       <a class="text-link" href="index.html">Back to site</a>
@@ -57,6 +57,13 @@
 
     <section id="adminDashboard" class="admin-dashboard" hidden>
 
+      <div class="admin-tabs" role="tablist">
+        <button type="button" class="admin-tab is-active" role="tab" data-tab="products" aria-selected="true">Products</button>
+        <button type="button" class="admin-tab" role="tab" data-tab="orders" aria-selected="false">Orders <span id="adminOrdersBadge" class="admin-badge" hidden></span></button>
+      </div>
+
+      <div id="adminProductsPane">
+
       <div class="admin-toolbar">
         <label class="field admin-search">
           <span>Search</span>
@@ -96,6 +103,48 @@
           </thead>
           <tbody id="adminProductList"></tbody>
         </table>
+      </div>
+
+      </div>
+
+      <div id="adminOrdersPane" hidden>
+        <div class="admin-toolbar">
+          <label class="field admin-search">
+            <span>Search</span>
+            <input type="search" id="orderSearch" placeholder="Order number, name, phone or email…" />
+          </label>
+          <label class="field">
+            <span>Payment</span>
+            <select id="orderPaymentFilter">
+              <option value="paid" selected>Paid</option>
+              <option value="all">All</option>
+              <option value="created">Awaiting payment</option>
+              <option value="failed">Payment failed</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </label>
+          <button type="button" id="ordersRefresh" class="button button-secondary admin-add-button">Refresh</button>
+        </div>
+
+        <p id="ordersStatus" class="admin-list-status" aria-live="polite"></p>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-orders-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Placed</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th>Email</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="adminOrderList"></tbody>
+          </table>
+        </div>
       </div>
 
     </section>
@@ -165,6 +214,16 @@
           <button type="submit" id="adminFormSave" class="button button-gold">Save product</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="adminOrderOverlay" class="admin-form-overlay" hidden>
+    <div class="admin-form-panel admin-order-panel">
+      <div class="admin-form-header">
+        <h3 id="orderDetailTitle">Order</h3>
+        <button type="button" id="orderDetailClose" class="cart-close" aria-label="Close">×</button>
+      </div>
+      <div id="orderDetailBody"></div>
     </div>
   </div>
 

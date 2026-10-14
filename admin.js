@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el) el.hidden = el !== section;
     });
     if (logoutButton) logoutButton.hidden = section !== dashboardSection;
+    if (section === dashboardSection) startOrdersPolling();
+    else stopOrdersPolling();
   };
 
   const populateCategoryOptions = () => {
@@ -446,6 +448,318 @@ document.addEventListener('DOMContentLoaded', () => {
     if (toggle) {
       toggleStock(toggle.dataset.id, toggle.checked);
     }
+  });
+
+  
+
+  // ---------------------------------------------------------------------------
+  // Orders
+  // ---------------------------------------------------------------------------
+  const tabButtons = document.querySelectorAll('.admin-tab');
+  const productsPane = document.getElementById('adminProductsPane');
+  const ordersPane = document.getElementById('adminOrdersPane');
+  const ordersBadge = document.getElementById('adminOrdersBadge');
+  const orderSearch = document.getElementById('orderSearch');
+  const orderPaymentFilter = document.getElementById('orderPaymentFilter');
+  const ordersRefresh = document.getElementById('ordersRefresh');
+  const ordersStatus = document.getElementById('ordersStatus');
+  const orderList = document.getElementById('adminOrderList');
+  const orderOverlay = document.getElementById('adminOrderOverlay');
+  const orderDetailTitle = document.getElementById('orderDetailTitle');
+  const orderDetailBody = document.getElementById('orderDetailBody');
+  const orderDetailClose = document.getElementById('orderDetailClose');
+
+  const ORDERS_SEEN_KEY = 'trishul_admin_orders_seen';
+  const ORDERS_POLL_MS = 30000;
+  let activeTab = 'products';
+  let allOrders = [];
+  const orderItemsById = new Map();
+  let ordersTimer = null;
+  let ordersLoading = false;
+  let ordersLoadedAt = null;
+  let dbAdmin = null;
+  let openOrderId = null;
+
+  const readSeen = () => { try { return localStorage.getItem(ORDERS_SEEN_KEY) || ''; } catch (err) { return ''; } };
+  const writeSeen = (value) => { try { localStorage.setItem(ORDERS_SEEN_KEY, value); } catch (err) { /* private mode */ } };
+
+  const formatDate = (iso) => (iso
+    ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '—');
+
+  const PAYMENT_BADGES = {
+    paid: ['Paid', 'is-good'],
+    created: ['Awaiting payment', 'is-muted'],
+    failed: ['Failed', 'is-bad'],
+    partially_refunded: ['Part refunded', 'is-warn'],
+    refunded: ['Refunded', 'is-warn'],
+  };
+  const paymentBadge = (status) => {
+    const [label, cls] = PAYMENT_BADGES[status] || [status || '—', 'is-muted'];
+    return `<span class="admin-pill ${cls}">${escapeHtml(label)}</span>`;
+  };
+  const isPaidLike = (order) => ['paid', 'partially_refunded', 'refunded'].includes(order.payment_status);
+  const emailBadge = (order) => {
+    if (!isPaidLike(order)) return '<span class="admin-pill is-muted">—</span>';
+    if (order.confirmation_email_status === 'sent') return '<span class="admin-pill is-good">Sent</span>';
+    if (order.confirmation_email_status === 'failed') return '<span class="admin-pill is-bad">Failed</span>';
+    return '<span class="admin-pill is-muted">Sending</span>';
+  };
+
+  const itemsSummary = (orderId) => {
+    const items = orderItemsById.get(orderId) || [];
+    if (!items.length) return '—';
+    const shown = items.slice(0, 2).map((item) => `${item.quantity}× ${escapeHtml(item.product_name)}${item.size ? ` (${escapeHtml(item.size)})` : ''}`);
+    if (items.length > 2) shown.push(`+${items.length - 2} more`);
+    return shown.join('<br>');
+  };
+
+  const orderMatches = (order, query) => {
+    if (!query) return true;
+    const details = order.shipping_details || {};
+    return [order.order_number, details.full_name, details.phone, details.email, order.razorpay_order_id]
+      .some((value) => String(value || '').toLowerCase().includes(query));
+  };
+
+  const renderOrders = () => {
+    const query = (orderSearch.value || '').trim().toLowerCase();
+    const rows = allOrders.filter((order) => orderMatches(order, query));
+    const stamp = ordersLoadedAt ? ` · updated ${ordersLoadedAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}` : '';
+    const limited = allOrders.length >= 300 ? ' (latest 300)' : '';
+    ordersStatus.textContent = `${rows.length} order${rows.length === 1 ? '' : 's'}${limited}${stamp}`;
+
+    if (!rows.length) {
+      orderList.innerHTML = '<tr><td colspan="8" class="admin-empty-row">No orders match these filters.</td></tr>';
+      return;
+    }
+
+    orderList.innerHTML = rows.map((order) => {
+      const details = order.shipping_details || {};
+      return `
+        <tr class="admin-order-row" data-id="${escapeHtml(order.id)}">
+          <td><strong>${escapeHtml(order.order_number || '—')}</strong></td>
+          <td>${escapeHtml(formatDate(order.paid_at || order.created_at))}</td>
+          <td>${escapeHtml(details.full_name || '—')}<br><span class="admin-muted">${escapeHtml(details.phone || '')}</span></td>
+          <td>${itemsSummary(order.id)}</td>
+          <td>${inr(order.total_amount)}</td>
+          <td>${paymentBadge(order.payment_status)}</td>
+          <td>${emailBadge(order)}</td>
+          <td class="admin-row-actions"><button type="button" class="text-button admin-order-view" data-id="${escapeHtml(order.id)}">View</button></td>
+        </tr>`;
+    }).join('');
+  };
+
+  const markOrdersSeen = async () => {
+    const { data } = await client.from('orders').select('paid_at').eq('payment_status', 'paid')
+      .order('paid_at', { ascending: false }).limit(1);
+    if (data && data[0] && data[0].paid_at) writeSeen(data[0].paid_at);
+    ordersBadge.hidden = true;
+  };
+
+  const refreshBadge = async () => {
+    if (activeTab === 'orders') { ordersBadge.hidden = true; return; }
+    const seen = readSeen();
+    let query = client.from('orders').select('id', { count: 'exact', head: true }).eq('payment_status', 'paid');
+    if (seen) query = query.gt('paid_at', seen);
+    const { count, error } = await query;
+    if (error) return;
+    ordersBadge.textContent = count > 99 ? '99+' : String(count || 0);
+    ordersBadge.hidden = !count;
+  };
+
+  const loadOrders = async ({ silent = false } = {}) => {
+    if (ordersLoading) return;
+    ordersLoading = true;
+    if (!silent) ordersStatus.textContent = 'Loading…';
+    try {
+      if (dbAdmin === null) {
+        const { data } = await client.rpc('is_admin');
+        dbAdmin = !!data;
+      }
+      if (!dbAdmin) {
+        allOrders = [];
+        orderList.innerHTML = '<tr><td colspan="8" class="admin-empty-row">This login is not an admin in the database, so orders cannot be shown. Add this email with supabase/admin-setup.sql.</td></tr>';
+        ordersStatus.textContent = '';
+        return;
+      }
+
+      let query = client.from('orders').select('*').order('created_at', { ascending: false }).limit(300);
+      const filter = orderPaymentFilter.value;
+      if (filter === 'refunded') query = query.in('payment_status', ['refunded', 'partially_refunded']);
+      else if (filter !== 'all') query = query.eq('payment_status', filter);
+      const { data, error } = await query;
+      if (error) throw error;
+      allOrders = data || [];
+
+      const missing = allOrders.map((order) => order.id).filter((id) => !orderItemsById.has(id));
+      for (let i = 0; i < missing.length; i += 40) {
+        const chunk = missing.slice(i, i + 40);
+        const { data: items, error: itemsError } = await client.from('order_items').select('*').in('order_id', chunk);
+        if (itemsError) throw itemsError;
+        chunk.forEach((id) => orderItemsById.set(id, []));
+        (items || []).forEach((item) => orderItemsById.get(item.order_id).push(item));
+      }
+
+      ordersLoadedAt = new Date();
+      renderOrders();
+      if (activeTab === 'orders') await markOrdersSeen();
+    } catch (err) {
+      console.error('Load orders failed:', err);
+      ordersStatus.textContent = 'Could not load orders. Check your connection and press Refresh.';
+    } finally {
+      ordersLoading = false;
+    }
+  };
+
+  const setTab = (tab) => {
+    activeTab = tab;
+    tabButtons.forEach((button) => {
+      const active = button.dataset.tab === tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    productsPane.hidden = tab !== 'products';
+    ordersPane.hidden = tab !== 'orders';
+    if (tab === 'orders') loadOrders();
+    else refreshBadge();
+  };
+
+  const stopOrdersPolling = () => {
+    if (ordersTimer) clearInterval(ordersTimer);
+    ordersTimer = null;
+    dbAdmin = null;
+    allOrders = [];
+    orderItemsById.clear();
+    ordersBadge.hidden = true;
+    activeTab = 'products';
+    if (orderOverlay) orderOverlay.hidden = true;
+  };
+
+  const startOrdersPolling = () => {
+    if (ordersTimer || !client) return;
+    setTab('products');
+    refreshBadge();
+    ordersTimer = setInterval(() => {
+      if (document.hidden) return;
+      if (activeTab === 'orders') loadOrders({ silent: true });
+      else refreshBadge();
+    }, ORDERS_POLL_MS);
+  };
+
+  const detailRow = (label, value) => `<div class="admin-detail-row"><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`;
+
+  const closeOrderDetail = () => {
+    orderOverlay.hidden = true;
+    openOrderId = null;
+    if (formOverlay.hidden) document.body.classList.remove('cart-open');
+  };
+
+  const openOrderDetail = async (id) => {
+    const order = allOrders.find((o) => o.id === id);
+    if (!order) return;
+    openOrderId = id;
+    const details = order.shipping_details || {};
+    orderDetailTitle.textContent = order.order_number ? `Order ${order.order_number}` : 'Order';
+    orderDetailBody.innerHTML = '<p class="admin-muted">Loading…</p>';
+    orderOverlay.hidden = false;
+    document.body.classList.add('cart-open');
+
+    const [paymentsResult, refundsResult] = await Promise.all([
+      client.from('payments').select('*').eq('order_id', id).order('created_at', { ascending: true }),
+      client.from('refunds').select('*').eq('order_id', id).order('created_at', { ascending: true }),
+    ]);
+    if (openOrderId !== id) return;
+
+    const items = orderItemsById.get(id) || [];
+    const payments = paymentsResult.data || [];
+    const refunds = refundsResult.data || [];
+    const phone = String(details.phone || '').replace(/\D/g, '');
+    const addressText = [details.full_name, details.address, `${details.city || ''}, ${details.state || ''} ${details.pincode || ''}`.trim(), details.country, details.phone ? `Phone: ${details.phone}` : '']
+      .filter(Boolean).join('\n');
+
+    orderDetailBody.innerHTML = `
+      <div class="admin-detail-top">
+        ${paymentBadge(order.payment_status)}
+        <span class="admin-muted">Placed ${escapeHtml(formatDate(order.created_at))}${order.paid_at ? ` · Paid ${escapeHtml(formatDate(order.paid_at))}` : ''}</span>
+      </div>
+
+      <h4 class="admin-detail-heading">Customer</h4>
+      <dl class="admin-detail-list">
+        ${detailRow('Name', escapeHtml(details.full_name || '—'))}
+        ${detailRow('Phone', phone ? `<a href="tel:+91${escapeHtml(phone)}">${escapeHtml(details.phone)}</a> · <a href="https://wa.me/91${escapeHtml(phone)}" target="_blank" rel="noopener">WhatsApp</a>` : '—')}
+        ${detailRow('Email', details.email ? `<a href="mailto:${escapeHtml(details.email)}">${escapeHtml(details.email)}</a>` : '—')}
+        ${detailRow('Account', order.user_id ? 'Signed-in customer' : 'Guest checkout')}
+      </dl>
+
+      <h4 class="admin-detail-heading">Ship to <button type="button" class="text-button admin-copy-address">Copy address</button></h4>
+      <p class="admin-detail-address">${escapeHtml(addressText).replace(/\n/g, '<br>') || escapeHtml(order.shipping_address || '—')}</p>
+      ${order.notes ? `<h4 class="admin-detail-heading">Customer note</h4><p class="admin-detail-address">${escapeHtml(order.notes)}</p>` : ''}
+
+      <h4 class="admin-detail-heading">Items</h4>
+      <table class="admin-detail-items">
+        ${items.map((item) => `<tr><td>${escapeHtml(item.product_name)}${item.size ? ` <span class="admin-muted">(${escapeHtml(item.size)})</span>` : ''}</td><td>${escapeHtml(item.quantity)} × ${inr(item.unit_price)}</td><td class="num">${inr(Number(item.unit_price) * Number(item.quantity))}</td></tr>`).join('') || '<tr><td colspan="3" class="admin-muted">No items.</td></tr>'}
+        <tr class="total"><td colspan="2">Shipping</td><td class="num">${Number(order.shipping_fee) > 0 ? inr(order.shipping_fee) : 'Free'}</td></tr>
+        <tr class="total"><td colspan="2"><strong>Total</strong></td><td class="num"><strong>${inr(order.total_amount)}</strong></td></tr>
+      </table>
+
+      <h4 class="admin-detail-heading">Payments</h4>
+      ${payments.length ? payments.map((p) => `
+        <div class="admin-detail-payment">
+          <div>${paymentBadge(p.status === 'captured' ? 'paid' : p.status)} ${escapeHtml(inr(p.amount))}${p.method ? ` · ${escapeHtml(p.method)}` : ''}</div>
+          <div class="admin-muted">${escapeHtml(p.razorpay_payment_id)} · ${escapeHtml(formatDate(p.paid_at || p.created_at))}</div>
+          ${p.error_description ? `<div class="admin-muted">${escapeHtml(p.error_description)}</div>` : ''}
+        </div>`).join('') : '<p class="admin-muted">No payment attempts yet.</p>'}
+      ${refunds.length ? `<h4 class="admin-detail-heading">Refunds</h4>${refunds.map((r) => `<div class="admin-detail-payment"><div>${escapeHtml(inr(r.amount))} · ${escapeHtml(r.status)}</div><div class="admin-muted">${escapeHtml(r.razorpay_refund_id)} · ${escapeHtml(formatDate(r.created_at))}</div></div>`).join('')}` : ''}
+
+      ${isPaidLike(order) ? `
+        <h4 class="admin-detail-heading">Confirmation email</h4>
+        <p>${emailBadge(order)} <span class="admin-muted">${order.confirmation_email_sent_at ? escapeHtml(formatDate(order.confirmation_email_sent_at)) : ''}</span></p>
+        ${order.confirmation_email_error ? `<p class="admin-muted">Last error: ${escapeHtml(order.confirmation_email_error)}</p>` : ''}
+        <button type="button" class="button button-secondary admin-resend-email">${order.confirmation_email_status === 'sent' ? 'Resend confirmation email' : 'Send confirmation email'}</button>
+        <p id="orderDetailMessage" class="auth-message" aria-live="polite"></p>` : ''}
+    `;
+
+    orderDetailBody.querySelector('.admin-copy-address')?.addEventListener('click', async (event) => {
+      try {
+        await navigator.clipboard.writeText(addressText);
+        event.target.textContent = 'Copied';
+      } catch (err) {
+        event.target.textContent = 'Copy failed';
+      }
+    });
+
+    orderDetailBody.querySelector('.admin-resend-email')?.addEventListener('click', async (event) => {
+      const button = event.target;
+      const message = document.getElementById('orderDetailMessage');
+      button.disabled = true;
+      message.textContent = 'Sending…';
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        const response = await fetch('/payments/resend-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+          body: JSON.stringify({ order_id: id }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'Could not send the email.');
+        await loadOrders({ silent: true });
+        if (openOrderId === id) openOrderDetail(id);
+      } catch (err) {
+        message.textContent = err.message || 'Could not send the email.';
+        button.disabled = false;
+      }
+    });
+  };
+
+  tabButtons.forEach((button) => button.addEventListener('click', () => setTab(button.dataset.tab)));
+  orderSearch.addEventListener('input', renderOrders);
+  orderPaymentFilter.addEventListener('change', () => loadOrders());
+  ordersRefresh.addEventListener('click', () => loadOrders());
+  orderDetailClose.addEventListener('click', closeOrderDetail);
+  orderOverlay.addEventListener('click', (event) => { if (event.target === orderOverlay) closeOrderDetail(); });
+  orderList.addEventListener('click', (event) => {
+    const row = event.target.closest('.admin-order-row');
+    if (row) openOrderDetail(row.dataset.id);
   });
 
   checkAccess();

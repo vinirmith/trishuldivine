@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const getCart = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      return Array.isArray(saved) ? saved : [];
+      // Only lines that carry a product id can be priced by the server at checkout.
+      return Array.isArray(saved) ? saved.filter((item) => item && item.product_id && Number(item.quantity) > 0) : [];
     } catch (error) {
       return [];
     }
@@ -18,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveCart = (items) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   };
+
+  const MAX_LINE_QUANTITY = 20;
+  const lineKey = (item) => `${item.product_id}::${item.size || ''}`;
 
   let supabaseClient = null;
   const getSupabaseClient = () => {
@@ -111,25 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const showCheckoutSuccess = () => {
-    const panel = document.getElementById('cartPanel');
-    if (!panel) return;
-
-    const form = panel.querySelector('.checkout-form');
-    const status = panel.querySelector('.cart-status');
-    const checkoutButton = panel.querySelector('.cart-checkout');
-    const summary = panel.querySelector('.cart-summary');
-
-    if (form) form.hidden = true;
-    if (status) {
-      status.hidden = false;
-      status.classList.add('is-success');
-      status.textContent = 'Order placed successfully. We will contact you soon.';
-    }
-    if (checkoutButton) checkoutButton.hidden = true;
-    if (summary) summary.textContent = 'Order placed';
-  };
-
   const renderCart = () => {
     const items = getCart();
     const itemCount = items.reduce((total, item) => total + (Number(item.quantity) || 1), 0);
@@ -160,18 +145,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     cartList.innerHTML = items.map((item) => `
-      <div class="cart-item" data-name="${item.name}">
-        <img src="${item.image || 'images/gemstone_beads.jpeg'}" alt="${item.name}">
+      <div class="cart-item" data-key="${escapeHtml(lineKey(item))}">
+        <img src="${escapeHtml(item.image || 'images/gemstone_beads.jpeg')}" alt="${escapeHtml(item.name)}">
         <div class="cart-item-copy">
           <div class="cart-item-top">
-            <h4>${item.name}</h4>
-            <button class="cart-remove-item" type="button" aria-label="Remove ${item.name}">×</button>
+            <h4>${escapeHtml(item.name)}${item.size ? ` <span class="cart-item-size">(${escapeHtml(item.size)})</span>` : ''}</h4>
+            <button class="cart-remove-item" type="button" aria-label="Remove ${escapeHtml(item.name)}">×</button>
           </div>
           <div class="cart-item-actions">
             <div class="cart-qty-controls">
-              <button class="cart-qty-button" data-action="decrease" data-name="${item.name}" type="button">−</button>
+              <button class="cart-qty-button" data-action="decrease" data-key="${escapeHtml(lineKey(item))}" type="button">−</button>
               <span>${item.quantity}</span>
-              <button class="cart-qty-button" data-action="increase" data-name="${item.name}" type="button">+</button>
+              <button class="cart-qty-button" data-action="increase" data-key="${escapeHtml(lineKey(item))}" type="button">+</button>
             </div>
           </div>
         </div>
@@ -184,120 +169,27 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const addToCart = (product) => {
+    const productId = String(product.id || '');
+    if (!productId) return;
     const name = sanitizeName(product.name || 'Product');
+    const size = sanitizeName(product.size || '');
     const image = product.image || 'images/gemstone_beads.jpeg';
-    const nameKey = name.toLowerCase();
-    const fallbackPrices = {
-      'smoky quartz bracelet': 1450,
-      'gemstone mala': 2200,
-      'rudraksha pendant': 1800,
-      'bracelet': 1600,
-      'rudraksha': 2000,
-      'chain': 1800,
-      ' gemstone beads': 1200,
-    };
-    const unitPrice = Number(product.unitPrice || fallbackPrices[nameKey] || 0);
+    // Display price only: the server re-prices every order from the products table.
+    const unitPrice = Number(product.unitPrice) || 0;
     const items = getCart();
-    const matchedIndex = items.findIndex((item) => item.name === name);
+    const key = lineKey({ product_id: productId, size });
+    const existing = items.find((item) => lineKey(item) === key);
 
     resetCheckoutState();
 
-    if (matchedIndex >= 0) {
-      items[matchedIndex].quantity += 1;
+    if (existing) {
+      existing.quantity = Math.min(existing.quantity + 1, MAX_LINE_QUANTITY);
     } else {
-      items.push({ name, image, quantity: 1, unit_price: unitPrice });
+      items.push({ product_id: productId, size, name, image, quantity: 1, unit_price: unitPrice });
     }
 
     saveCart(items);
     renderCart();
-  };
-
-  const submitOrderToSupabase = async (customerData) => {
-    const client = getSupabaseClient();
-    if (!client) {
-      alert('Supabase is not configured yet. Add your project URL and anon key in supabase-config.js before using checkout.');
-      return;
-    }
-
-    const items = getCart();
-    if (!items.length) return;
-
-    try {
-      const { data: { session } } = await client.auth.getSession();
-      const user = session?.user || null;
-
-      const customerInsert = {
-        full_name: customerData.full_name,
-        phone: customerData.phone || null,
-        email: customerData.email || null,
-        address: customerData.address || null,
-        city: customerData.city || null,
-        state: customerData.state || null,
-        pincode: customerData.pincode || null,
-        country: customerData.country || null,
-        user_id: user?.id || null,
-      };
-
-      const { data: customer, error: customerError } = await client
-        .from('customers')
-        .insert([customerInsert])
-        .select()
-        .single();
-
-      if (customerError) throw customerError;
-
-      const totalAmount = items.reduce((sum, item) => {
-        const unitPrice = Number(item.unit_price || 0);
-        return sum + unitPrice * Number(item.quantity || 1);
-      }, 0);
-
-      const { data: order, error: orderError } = await client
-        .from('orders')
-        .insert([{
-          customer_id: customer.id,
-          user_id: user?.id || null,
-          status: 'pending',
-          total_amount: totalAmount,
-          shipping_address: customerData.address || null,
-          notes: customerData.notes || null,
-        }])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_name: item.name,
-        product_image: item.image || null,
-        quantity: Number(item.quantity || 1),
-        unit_price: Number(item.unit_price || 0),
-      }));
-
-      const { error: orderItemsError } = await client
-        .from('order_items')
-        .insert(orderItems);
-
-      if (orderItemsError) throw orderItemsError;
-
-      localStorage.removeItem(STORAGE_KEY);
-      if (window.location.pathname.endsWith('checkout.html')) {
-        const statusBox = document.getElementById('checkoutSuccess');
-        const form = document.getElementById('checkoutForm');
-        if (statusBox) statusBox.hidden = false;
-        if (form) form.hidden = true;
-        const summary = document.querySelector('.checkout-summary');
-        if (summary) summary.textContent = 'Payment started';
-        const payButton = document.getElementById('payNowButton');
-        if (payButton) payButton.hidden = true;
-      } else {
-        renderCart();
-        showCheckoutSuccess();
-      }
-    } catch (error) {
-      console.error('Supabase order submission failed:', error);
-      alert('Could not save the order to Supabase. Check your database setup and project keys.');
-    }
   };
 
   const createCartPanel = () => {
@@ -404,7 +296,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const rawImage = (product.images && product.images[0]) || 'images/gemstone_beads.jpeg';
     const image = rawImage.replace(/^https:\/\/[a-z0-9]+\.supabase\.co/, window.SUPABASE_URL || '');
     const inStock = product.in_stock !== false;
-    const sizes = Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(' · ') : '';
+    const sizeList = Array.isArray(product.sizes) ? product.sizes : [];
+    const sizes = sizeList.length ? sizeList.join(' · ') : '';
+    const productUrl = `product.html?id=${encodeURIComponent(product.id)}`;
 
     const name = sanitizeName(product.name || 'Product');
     const card = document.createElement('article');
@@ -416,7 +310,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
         ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}
         ${inStock
-          ? `<button type="button" class="add-to-cart" data-name="${escapeHtml(name)}" data-image="${escapeHtml(image)}" data-price="${product.price || 0}">Add to cart</button>`
+          ? (sizeList.length > 1
+            ? `<button type="button" class="add-to-cart" data-href="${escapeHtml(productUrl)}">Select size</button>`
+            : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(product.id)}" data-size="${escapeHtml(sizeList[0] || '')}" data-name="${escapeHtml(name)}" data-image="${escapeHtml(image)}" data-price="${product.price || 0}">Add to cart</button>`)
           : `<span class="out-of-stock-badge">Out of stock</span>`}
       </div>
     `;
@@ -501,8 +397,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     if (addButton) {
       event.preventDefault();
       if (addButton.disabled) return;
+      if (addButton.dataset.href) {
+        window.location.href = addButton.dataset.href;
+        return;
+      }
       addToCart({
+        id: addButton.dataset.productId,
         name: addButton.dataset.name || 'Product',
+        size: addButton.dataset.size || '',
         image: addButton.dataset.image || 'images/gemstone_beads.jpeg',
         unitPrice: addButton.dataset.price,
       });
@@ -511,9 +413,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
 
     const removeButton = event.target.closest('.cart-remove-item');
     if (removeButton) {
-      const itemName = removeButton.closest('.cart-item')?.dataset.name;
-      if (!itemName) return;
-      const items = getCart().filter((item) => item.name !== itemName);
+      const itemKey = removeButton.closest('.cart-item')?.dataset.key;
+      if (!itemKey) return;
+      const items = getCart().filter((item) => lineKey(item) !== itemKey);
       saveCart(items);
       renderCart();
       return;
@@ -521,14 +423,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
 
     const qtyButton = event.target.closest('.cart-qty-button');
     if (qtyButton) {
-      const itemName = qtyButton.dataset.name;
+      const itemKey = qtyButton.dataset.key;
       const action = qtyButton.dataset.action;
       const items = getCart();
-      const current = items.find((item) => item.name === itemName);
+      const current = items.find((item) => lineKey(item) === itemKey);
       if (!current) return;
 
       if (action === 'increase') {
-        current.quantity += 1;
+        current.quantity = Math.min(current.quantity + 1, MAX_LINE_QUANTITY);
       }
       if (action === 'decrease') {
         current.quantity -= 1;
@@ -787,32 +689,86 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
   if (checkoutForm) {
     const client = getSupabaseClient();
     const userSummary = document.getElementById('checkoutUserSummary');
+    const payButton = document.getElementById('payNowButton');
+    const errorBox = document.getElementById('checkoutError');
+    const noticeBox = document.getElementById('checkoutNotice');
+    const successBox = document.getElementById('checkoutSuccess');
+    const inr = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    const populateCheckoutState = async () => {
+    const showError = (message) => {
+      if (!errorBox) return;
+      errorBox.textContent = message || '';
+      errorBox.hidden = !message;
+      if (message) errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    const setBusy = (busy, label) => {
+      payButton.disabled = busy;
+      payButton.textContent = busy ? label : 'Pay now';
+    };
+
+    // Re-reads name, price and availability from the catalogue so the summary
+    // matches what the server will charge. Lines that can no longer be bought are dropped.
+    const syncCartWithCatalog = async () => {
       const items = getCart();
+      if (!client || !items.length) return { items, problems: [] };
+      const ids = [...new Set(items.map((item) => item.product_id))];
+      const { data, error } = await withRetry(() => client.from('products').select('id,name,price,in_stock').in('id', ids));
+      if (error || !data) return { items, problems: [] };
+
+      const byId = new Map(data.map((product) => [product.id, product]));
+      const problems = [];
+      const synced = [];
+      items.forEach((item) => {
+        const product = byId.get(item.product_id);
+        if (!product) {
+          problems.push(`${item.name} is no longer available and was removed from your cart.`);
+        } else if (product.in_stock === false) {
+          problems.push(`${product.name} is out of stock and was removed from your cart.`);
+        } else {
+          synced.push({ ...item, name: sanitizeName(product.name), unit_price: Number(product.price) || 0 });
+        }
+      });
+      saveCart(synced);
+      return { items: synced, problems };
+    };
+
+    const renderCheckoutSummary = (items) => {
       const cartList = document.getElementById('checkoutCartItems');
       const total = document.getElementById('checkoutTotal');
       const emptyState = document.getElementById('checkoutEmpty');
-
       if (!cartList || !total || !emptyState) return;
 
       if (!items.length) {
         emptyState.hidden = false;
         cartList.hidden = true;
         total.textContent = '₹0';
+        payButton.disabled = true;
         return;
       }
 
-      const subtotal = items.reduce((sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)), 0);
+      const subtotal = items.reduce((sum, item) => sum + Number(item.unit_price || 0) * Number(item.quantity || 1), 0);
       cartList.innerHTML = items.map((item) => `
         <div class="checkout-item">
-          <span>${item.name} × ${item.quantity}</span>
-          <strong>₹${(Number(item.unit_price || 0) * Number(item.quantity || 1)).toLocaleString('en-IN')}</strong>
+          <span>${escapeHtml(item.name)}${item.size ? ` (${escapeHtml(item.size)})` : ''} × ${item.quantity}</span>
+          <strong>${inr(Number(item.unit_price || 0) * Number(item.quantity || 1))}</strong>
         </div>
       `).join('');
-      total.textContent = `₹${subtotal.toLocaleString('en-IN')}`;
+      total.textContent = inr(subtotal);
       emptyState.hidden = true;
       cartList.hidden = false;
+      payButton.disabled = false;
+    };
+
+    const populateCheckoutState = async () => {
+      renderCheckoutSummary(getCart());
+      const { items, problems } = await syncCartWithCatalog();
+      renderCheckoutSummary(items);
+      if (noticeBox) {
+        noticeBox.textContent = problems.join(' ');
+        noticeBox.hidden = !problems.length;
+      }
     };
 
     populateCheckoutState();
@@ -827,31 +783,193 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
           if (userSummary) {
             userSummary.textContent = `Logged in as ${session.user.email}`;
           }
+        } else if (userSummary) {
+          userSummary.textContent = 'Checking out as a guest.';
         }
       }).catch(() => {});
     }
 
+    const getAccessToken = async () => {
+      if (!client) return null;
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        return session?.access_token || null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const requestJson = async (path, { method = 'GET', body } = {}) => {
+      const token = await getAccessToken();
+      const response = await fetch(path, {
+        method,
+        headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = null;
+      try { data = await response.json(); } catch (error) { /* non-JSON error page */ }
+      return { ok: response.ok, status: response.status, data: data || {} };
+    };
+
+    const loadRazorpay = () => new Promise((resolve, reject) => {
+      if (window.Razorpay) { resolve(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Could not load the payment window. Check your connection and try again.'));
+      document.head.appendChild(script);
+    });
+    loadRazorpay().catch(() => {}); // warm up; the submit handler retries and reports errors
+
+    let pending = null;        // the Razorpay order for the current cart + address, reused on retry
+    let paymentOpen = false;
+    let finished = false;
+
+    const showSuccess = (orderNumber, email) => {
+      finished = true;
+      saveCart([]);
+      renderCheckoutSummary([]);
+      showError('');
+      if (noticeBox) noticeBox.hidden = true;
+      checkoutForm.hidden = true;
+      document.getElementById('checkoutOrderNumber').textContent = orderNumber || '';
+      document.getElementById('checkoutOrderEmail').textContent = email || '';
+      successBox.hidden = false;
+      successBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const pollUntilPaid = async (checkout, attempts) => {
+      for (let i = 0; i < attempts; i += 1) {
+        try {
+          const result = await requestJson(`/payments/status?token=${encodeURIComponent(checkout.public_token)}`);
+          if (result.ok && result.data.payment_status === 'paid') return true;
+        } catch (error) { /* keep polling */ }
+        await sleep(2000);
+      }
+      return false;
+    };
+
+    const confirmPayment = async (checkout, response) => {
+      setBusy(true, 'Confirming payment…');
+      showError('');
+      let confirmed = false;
+      let rejected = false;
+      try {
+        const result = await requestJson('/payments/verify', { method: 'POST', body: {
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        } });
+        confirmed = result.ok && result.data.status === 'paid';
+        rejected = !result.ok && result.status >= 400 && result.status < 500 && result.status !== 429;
+        if (rejected) showError(`${result.data.message || 'We could not confirm your payment.'} Your order number is ${checkout.order_number}. If money was deducted, please contact us with this number.`);
+      } catch (error) { /* network problem: fall through to polling */ }
+
+      // The server also learns about the payment from Razorpay directly, so give it a moment.
+      if (!confirmed && !rejected) confirmed = await pollUntilPaid(checkout, 8);
+
+      if (confirmed) {
+        showSuccess(checkout.order_number, checkout.prefill?.email);
+        return;
+      }
+      setBusy(false);
+      paymentOpen = false;
+      if (!rejected) {
+        showError(`We received your payment details but are still confirming order ${checkout.order_number}. Please do not pay again. You will get an email shortly, or contact us with this order number.`);
+      }
+    };
+
+    const openPayment = (checkout) => {
+      const razorpay = new window.Razorpay({
+        key: checkout.key_id,
+        amount: checkout.amount,
+        currency: checkout.currency,
+        order_id: checkout.razorpay_order_id,
+        name: 'Trishul Divine',
+        description: checkout.description,
+        prefill: checkout.prefill,
+        notes: { order_number: checkout.order_number },
+        theme: { color: '#3d4a39' },
+        modal: {
+          confirm_close: true,
+          ondismiss: async () => {
+            if (finished) return;
+            setBusy(true, 'Checking payment…');
+            // The customer may have paid and closed the window before the result came back.
+            const paid = await pollUntilPaid(checkout, 2);
+            if (paid) { showSuccess(checkout.order_number, checkout.prefill?.email); return; }
+            paymentOpen = false;
+            setBusy(false);
+          },
+        },
+        handler: (response) => { confirmPayment(checkout, response); },
+      });
+      razorpay.on('payment.failed', (event) => {
+        const reason = event?.error?.description;
+        showError(`Payment failed${reason ? `: ${reason}` : ''}. You can try again.`);
+      });
+      razorpay.open();
+    };
+
     checkoutForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (paymentOpen || finished) return;
+      showError('');
+
       const formData = new FormData(checkoutForm);
+      const field = (name) => (formData.get(name) || '').toString().trim();
       const customer = {
-        full_name: (formData.get('full_name') || '').toString().trim(),
-        phone: (formData.get('phone') || '').toString().trim(),
-        email: (formData.get('email') || '').toString().trim(),
-        address: (formData.get('address') || '').toString().trim(),
-        city: (formData.get('city') || '').toString().trim(),
-        state: (formData.get('state') || '').toString().trim(),
-        pincode: (formData.get('pincode') || '').toString().trim(),
-        country: (formData.get('country') || '').toString().trim(),
-        notes: (formData.get('notes') || '').toString().trim(),
+        full_name: field('full_name'),
+        phone: field('phone'),
+        email: field('email'),
+        address: field('address'),
+        city: field('city'),
+        state: field('state'),
+        pincode: field('pincode'),
+        country: field('country'),
+        notes: field('notes'),
       };
 
       if (!customer.full_name || !customer.phone || !customer.email || !customer.address || !customer.city || !customer.state || !customer.pincode) {
-        alert('Please fill in your contact details and delivery address before continuing.');
+        showError('Please fill in your contact details and delivery address before continuing.');
+        return;
+      }
+      if (!/^[6-9]\d{9}$/.test(customer.phone.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, ''))) {
+        showError('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+      if (!/^[1-9]\d{5}$/.test(customer.pincode)) {
+        showError('Please enter a valid 6-digit pincode.');
         return;
       }
 
-      await submitOrderToSupabase(customer);
+      const items = getCart().map((item) => ({ product_id: item.product_id, size: item.size || '', quantity: item.quantity }));
+      if (!items.length) {
+        showError('Your cart is empty.');
+        return;
+      }
+
+      paymentOpen = true;
+      setBusy(true, 'Starting payment…');
+      try {
+        await loadRazorpay();
+        const signature = JSON.stringify({ items, customer });
+        if (!pending || pending.signature !== signature) {
+          const result = await requestJson('/payments/create-order', { method: 'POST', body: { items, customer } });
+          if (!result.ok) {
+            throw new Error(result.data.message || 'We could not start the payment. Please try again.');
+          }
+          pending = { signature, checkout: result.data };
+        }
+        setBusy(true, 'Waiting for payment…');
+        openPayment(pending.checkout);
+      } catch (error) {
+        console.error('Checkout failed:', error);
+        showError(error.message || 'We could not start the payment. Please try again.');
+        paymentOpen = false;
+        setBusy(false);
+        populateCheckoutState();
+      }
     });
   }
 });

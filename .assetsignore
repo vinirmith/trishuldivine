@@ -1,4 +1,5 @@
 worker.js
+server
 wrangler.jsonc
 .assetsignore
 .git
@@ -9,3 +10,8 @@ supabase
 *.docx
 CNAME
 .wrangler
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+PAYMENTS_SETUP.md

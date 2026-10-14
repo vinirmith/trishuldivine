@@ -11,7 +11,7 @@
 </head>
 <body class="checkout-page">
   <header>
-    <a href="index.html" class="logo">Trishuldivine</a>
+    <a href="index.html" class="logo" aria-label="Trishul Divine home"><span class="logo-crop"><img src="logo.jpeg" alt="Trishul Divine"></span></a>
     <nav>
       <ul>
         <li><a href="index.html">Home</a></li>
@@ -32,11 +32,14 @@
         <h1>Delivery details</h1>
 
         <div id="checkoutSuccess" class="checkout-success" hidden>
-          <p class="eyebrow success-label">Order placed</p>
-          <h2>Your order has been received.</h2>
-          <p>We will contact you soon on your phone or email to confirm dispatch.</p>
+          <p class="eyebrow success-label">Payment received</p>
+          <h2>Thank you, your order is confirmed.</h2>
+          <p>Your order number is <strong id="checkoutOrderNumber"></strong>. A confirmation email is on its way to <strong id="checkoutOrderEmail"></strong>, and we will email you again when your order ships.</p>
+          <p class="checkout-success-help">Can&rsquo;t find it? Check your spam folder or write to <a href="mailto:Trishuldevine@gmail.com">Trishuldevine@gmail.com</a> with your order number.</p>
           <a href="index.html" class="button button-gold">Continue shopping</a>
         </div>
+
+        <div id="checkoutNotice" class="checkout-notice" role="status" hidden></div>
 
         <form id="checkoutForm" class="checkout-form-page">
           <div class="field-grid two-col">
@@ -46,7 +49,7 @@
             </label>
             <label class="field">
               <span>Phone</span>
-              <input type="tel" name="phone" placeholder="98765 43210" required />
+              <input type="tel" name="phone" placeholder="98765 43210" autocomplete="tel" inputmode="tel" required />
             </label>
           </div>
 
@@ -57,7 +60,7 @@
             </label>
             <label class="field">
               <span>Country</span>
-              <input type="text" name="country" value="India" required />
+              <input type="text" name="country" value="India" readonly required />
             </label>
           </div>
 
@@ -72,7 +75,7 @@
             </label>
             <label class="field">
               <span>Pincode</span>
-              <input type="text" name="pincode" placeholder="500001" required />
+              <input type="text" name="pincode" placeholder="500001" inputmode="numeric" maxlength="6" autocomplete="postal-code" required />
             </label>
           </div>
 
@@ -86,7 +89,10 @@
             <textarea name="notes" rows="3" placeholder="Any instructions for delivery"></textarea>
           </label>
 
+          <div id="checkoutError" class="checkout-error" role="alert" hidden></div>
+
           <button id="payNowButton" class="button button-gold" type="submit">Pay now</button>
+          <p class="checkout-secure-note">Secure payment by Razorpay: UPI, cards, net banking and wallets. We deliver within India.</p>
         </form>
       </div>
 

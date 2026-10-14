@@ -1,3 +1,7 @@
 .wrangler/
 node_modules/
 *.docx
+.dev.vars
+.dev.vars.*
+.env
+.env.*

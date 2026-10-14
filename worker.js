@@ -1,10 +1,17 @@
-// Serves the static site and forwards /api/* to Supabase so browsers only talk
-// to trishuldivine.com (some ISPs block *.supabase.co directly).
+// Serves the static site, handles checkout/payment endpoints (/payments/*, see
+// server/payments.js) and forwards /api/* to Supabase so browsers only talk to
+// trishuldivine.com (some ISPs block *.supabase.co directly).
+import { handlePayments } from './server/payments.js';
+
 const SUPABASE_HOST = 'acnhzuiisexsiuondawt.supabase.co';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/payments' || url.pathname.startsWith('/payments/')) {
+      return handlePayments(request, env, ctx);
+    }
 
     if (url.pathname !== '/api' && !url.pathname.startsWith('/api/')) {
       return env.ASSETS.fetch(request);

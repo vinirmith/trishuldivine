@@ -640,7 +640,7 @@ body.has-cart-bar { padding-bottom: 72px; }
 #ordersRefresh, .admin-resend-email { width: auto; }
 .field input, .field textarea { min-width: 0; width: 100%; }
 
-/* Header logo: logo.jpeg has wide margins, so it is cropped to the artwork. */
+/* Header logo: logo.png has wide margins, so it is cropped to the artwork. */
 .logo-crop { display: block; height: 56px; overflow: hidden; position: relative; width: 203px; }
 .logo-crop img { display: block; filter: brightness(1.04); height: auto; left: -15px; mix-blend-mode: multiply; position: absolute; top: -9px; width: 230px; }
 body:has(.hero) .logo-crop, body:has(.page-hero) .logo-crop { border-radius: 8px; }

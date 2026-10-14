@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Product details from Trishul Divine.">
-<title>Product - Trishuldivine</title>
+<meta name="description" content="Natural gemstone and mala bracelets from Trishul Divine, chosen for daily wear and personal intention.">
+<title>Bracelets - Trishuldivine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=Marcellus&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
   <header>
-    <a href="index.html" class="logo" aria-label="Trishul Divine home"><span class="logo-crop"><img src="logo.png" alt="Trishul Divine"></span></a>
+    <a href="index.html" class="logo" aria-label="Trishul Divine home"><span class="logo-crop"><img src="images/brand/logo.png" alt="Trishul Divine"></span></a>
     <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
@@ -30,8 +30,16 @@
   </header>
 
   <main>
-    <div class="product-page" id="productPage">
-      <p class="shop-empty">Loading product…</p>
+    <div class="page-content shop-page">
+      <span class="eyebrow">Bracelets</span>
+      <h1>Bracelets</h1>
+      <p class="lead">Hand-selected gemstone and mala bracelets for everyday wear, each strung to carry a little intention with you.</p>
+
+      <div class="shop-grid" data-shop-category="bracelets">
+        <p class="shop-empty">Loading products…</p>
+      </div>
+
+      <a class="button button-gold" href="https://wa.me/919999999999" target="_blank" rel="noopener">Enquire on WhatsApp <svg class="arrow-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(0deg)"><path d="M4 12h15M13 6l6 6-6 6"/></svg></a>
     </div>
   </main>
 
@@ -75,8 +83,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js"></script>
-  <script src="script.js"></script>
-  <script src="product.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/script.js"></script>
 </body>
 </html>

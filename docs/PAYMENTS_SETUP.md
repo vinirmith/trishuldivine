@@ -7,7 +7,7 @@ first and only switch to live keys at step 7.
 ## How it works
 
 1. Customer submits `checkout.html`. The browser sends **only product ids, sizes, quantities and the address** to `POST /payments/create-order`.
-2. The Worker (`server/payments.js`) calls the database function `create_checkout_order`, which **prices the order from the `products` table** (the browser can never set a price), then creates the Razorpay order and returns it.
+2. The Worker (`src/server/payments.js`) calls the database function `create_checkout_order`, which **prices the order from the `products` table** (the browser can never set a price), then creates the Razorpay order and returns it.
 3. Razorpay Checkout opens. Card/UPI details never touch this site.
 4. On success the browser calls `POST /payments/verify`. The Worker checks Razorpay's signature, confirms the payment with Razorpay (capturing it if needed), and marks the order paid.
 5. **Razorpay's webhook** (`POST /payments/webhook`) is the safety net: it marks the order paid even if the customer closes the tab, records failures and refunds, and retries a failed confirmation email.

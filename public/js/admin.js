@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldInStockLabel = document.getElementById('fieldInStockLabel');
 
   if (!client) {
-    if (loginMessage) loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in supabase-config.js.';
+    if (loginMessage) loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in js/supabase-config.js.';
   }
 
   let allProducts = [];
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginMessage.textContent = 'Signing in…';
 
     if (!client) {
-      loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in supabase-config.js.';
+      loginMessage.textContent = 'Supabase is not configured. Add your project URL and anon key in js/supabase-config.js.';
       return;
     }
 

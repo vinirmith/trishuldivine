@@ -31,7 +31,7 @@ body:has(.page-hero) nav a:hover, body:has(.page-hero) nav a.active { color: var
 nav { grid-column: 2; }
 nav ul { display: flex; gap: clamp(18px, 3vw, 42px); list-style: none; }
 nav a, .header-whatsapp, .cart-button { font-size: .72rem; letter-spacing: 1.5px; text-decoration: none; text-transform: uppercase; }
-nav a { color: var(--ink-soft); }
+nav a { color: var(--ink-soft); font-weight: 600; }
 nav a:hover, nav a.active { color: var(--clay); }
 .header-actions { align-items: center; display: flex; gap: 18px; grid-column: 3; justify-self: end; }
 .header-whatsapp { border-bottom: 1px solid var(--clay); justify-self: end; padding-bottom: 4px; }
@@ -243,10 +243,10 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .category-card { background-position: center; background-size: cover; color: var(--white); display: flex; flex-direction: column; height: 470px; justify-content: flex-end; overflow: hidden; padding: 28px; position: relative; text-decoration: none; transition: box-shadow .4s ease, transform .4s ease; }
 .category-card::before { background: linear-gradient(0deg, rgba(25, 29, 22, .82), transparent 70%); content: ''; inset: 0; position: absolute; }
 .category-card:hover { box-shadow: 0 26px 50px rgba(30, 32, 28, .38); transform: translateY(-6px); }
-.category-gemstones { background-image: url('images/gemstone_beads.jpeg'); }
-.category-malas { background-image: url('images/mala-bracelets.jpeg'); }
-.category-rudraksha { background-image: url('images/rudraksha_mala.jpg'); }
-.category-chains { background-image: url('images/chain/chain1.jpeg'); }
+.category-gemstones { background-image: url('../images/gemstone_beads.jpeg'); }
+.category-malas { background-image: url('../images/mala-bracelets.jpeg'); }
+.category-rudraksha { background-image: url('../images/rudraksha_mala.jpg'); }
+.category-chains { background-image: url('../images/chain/chain1.jpeg'); }
 .category-card > * { position: relative; }
 .category-number { color: var(--gold); font-size: .7rem; letter-spacing: 2px; margin-bottom: auto; }
 .category-label { font-family: 'Marcellus', serif; font-size: 1.7rem; }
@@ -288,9 +288,9 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .product-image { align-items: flex-end; background-position: center; background-size: cover; display: flex; height: 390px; overflow: hidden; padding: 18px; transition: box-shadow .4s ease; }
 .product-card:hover .product-image { box-shadow: 0 26px 50px rgba(30, 32, 28, .28); }
 .product-image span { background: rgba(255, 253, 248, .9); color: var(--ink-soft); font-size: .62rem; letter-spacing: 1px; padding: 7px 9px; text-transform: uppercase; }
-.product-smoky { background-image: url('images/Gemstone%20bracelets%20smoky-quartz.webp'); }
-.product-mala { background-image: url('images/mala-bracelets.jpeg'); }
-.product-rudraksha { background-image: url('images/rudraksha.webp'); }
+.product-smoky { background-image: url('../images/Gemstone%20bracelets%20smoky-quartz.webp'); }
+.product-mala { background-image: url('../images/mala-bracelets.jpeg'); }
+.product-rudraksha { background-image: url('../images/rudraksha.webp'); }
 .product-meta { align-items: start; display: flex; justify-content: space-between; padding-top: 18px; }
 .product-meta h3 { font-size: 1.2rem; }
 .product-meta p { color: var(--ink-soft); font-size: .78rem; margin-top: 7px; }
@@ -640,12 +640,10 @@ body.has-cart-bar { padding-bottom: 72px; }
 #ordersRefresh, .admin-resend-email { width: auto; }
 .field input, .field textarea { min-width: 0; width: 100%; }
 
-/* Header logo: logo.png has wide margins, so it is cropped to the artwork. */
-.logo-crop { display: block; height: 56px; overflow: hidden; position: relative; width: 203px; }
-.logo-crop img { display: block; filter: brightness(1.04); height: auto; left: -15px; mix-blend-mode: multiply; position: absolute; top: -9px; width: 230px; }
-body:has(.hero) .logo-crop, body:has(.page-hero) .logo-crop { border-radius: 8px; }
-body:has(.hero) .logo-crop img, body:has(.page-hero) .logo-crop img { filter: none; mix-blend-mode: normal; }
+/* Header logo: logo.png has transparent margins, so it is cropped to the artwork. */
+.logo-crop { display: block; height: 56px; overflow: hidden; position: relative; width: 208px; }
+.logo-crop img { display: block; height: auto; left: -16px; position: absolute; top: -10px; width: 237px; }
 @media (max-width: 700px) {
-  .logo-crop { height: 44px; width: 160px; }
-  .logo-crop img { left: -12px; top: -7px; width: 181px; }
+  .logo-crop { height: 44px; width: 163px; }
+  .logo-crop img { left: -13px; top: -8px; width: 186px; }
 }

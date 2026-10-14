@@ -1,5 +1,5 @@
 // Serves the static site, handles checkout/payment endpoints (/payments/*, see
-// server/payments.js) and forwards /api/* to Supabase so browsers only talk to
+// src/server/payments.js) and forwards /api/* to Supabase so browsers only talk to
 // trishuldivine.com (some ISPs block *.supabase.co directly).
 import { handlePayments } from './server/payments.js';
 

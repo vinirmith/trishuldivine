@@ -1,16 +1,16 @@
 {
   "name": "trishuldivine",
-  "main": "worker.js",
+  "main": "src/worker.js",
   "compatibility_date": "2025-09-01",
   "assets": {
-    "directory": ".",
+    "directory": "./public",
     "binding": "ASSETS"
   },
   "observability": { "enabled": true },
   // Non-secret settings. Secrets (never put these here) are set with `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
   //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY
-  // See PAYMENTS_SETUP.md.
+  // See docs/PAYMENTS_SETUP.md.
   "vars": {
     "SUPABASE_URL": "https://acnhzuiisexsiuondawt.supabase.co",
     "SITE_URL": "https://trishuldivine.com",

@@ -7,7 +7,7 @@ Static site + Cloudflare Worker (payments, order emails, Supabase proxy) + Supab
 
 ```
 public/                  The website. Cloudflare serves exactly this folder (nothing else is published).
-  *.html                 Pages: index, about, contact, bracelets, rudraksha, chains, product, checkout, auth, admin
+  *.html                 Pages: index, about, contact, bracelets, rudraksha, mala, product, checkout, auth, admin
   css/style.css          All styles
   js/                    script.js (shop, cart, checkout), product.js, admin.js,
                          supabase-config.js, admin-config.js (admin allow-list)

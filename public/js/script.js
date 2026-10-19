@@ -358,20 +358,24 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     const client = getSupabaseClient();
     if (!client) return;
 
-    const { data, error } = await withRetry(() => client
+    const categories = ['mala', 'bracelets', 'rudraksha'];
+    const results = await Promise.all(categories.map((category) => withRetry(() => client
       .from('products')
       .select('*')
       .eq('in_stock', true)
+      .eq('category', category)
       .order('created_at', { ascending: false })
-      .limit(3));
+      .limit(3))));
 
-    if (error) {
-      console.error('Failed to load featured products:', error);
+    if (results.every((r) => r.error)) {
+      console.error('Failed to load featured products:', results[0].error);
       grid.innerHTML = '<p class="featured-empty">Could not load products right now. Please refresh.</p>';
       return;
     }
 
-    if (!data || !data.length) {
+    const data = results.flatMap((r) => r.data || []);
+
+    if (!data.length) {
       grid.innerHTML = '<p class="featured-empty">New arrivals coming soon.</p>';
       return;
     }

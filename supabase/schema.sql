@@ -124,7 +124,7 @@ select * from (values
   ('Gemstone Mala', 'Hand-strung gemstone mala, 108 beads.', 2200, 'bracelets', array['One size'], array['images/mala-bracelets.jpeg'], true),
   ('Rudraksha Pendant', 'Traditional, quality-checked Rudraksha pendant.', 1800, 'rudraksha', array['One size'], array['images/rudraksha.webp'], true),
   ('Rudraksha Mala', '108-bead Rudraksha mala for daily practice.', 2000, 'rudraksha', array['One size'], array['images/rudraksha_mala.jpg'], true),
-  ('Classic Chain', 'Everyday wear chain, finished and polished.', 1800, 'chains', array['18 in','20 in','22 in'], array['images/chain/chain1.jpeg'], true)
+  ('Classic Mala', 'Everyday wear chain, finished and polished.', 1800, 'mala', array['18 in','20 in','22 in'], array['images/chain/chain1.jpeg'], true)
 ) as seed(name, description, price, category, sizes, images, in_stock)
 where not exists (select 1 from public.products);
 

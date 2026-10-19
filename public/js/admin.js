@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const populateCategoryOptions = () => {
     const categories = Array.from(new Set(allProducts.map((p) => p.category).filter(Boolean))).sort();
-    const defaults = ['bracelets', 'rudraksha', 'chains'];
+    const defaults = ['bracelets', 'rudraksha', 'mala'];
     const merged = Array.from(new Set([...defaults, ...categories]));
 
     categoryFilter.innerHTML = '<option value="">All categories</option>' +

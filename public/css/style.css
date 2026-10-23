@@ -309,7 +309,7 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .closing-cta h2 em { color: var(--gold); }
 
 .site-footer { background: var(--ink); color: rgba(255, 253, 248, .7); padding: 70px 5vw 0; }
-.footer-top { display: grid; gap: 50px; grid-template-columns: 1.4fr 1fr 1fr 1.4fr; margin: 0 auto; max-width: 1240px; padding-bottom: 50px; }
+.footer-top { display: grid; gap: 50px; grid-template-columns: 1.4fr 1fr 1fr 1.3fr 1.4fr; margin: 0 auto; max-width: 1240px; padding-bottom: 50px; }
 .footer-logo { color: var(--white); font-family: 'Marcellus', serif; font-size: 1.1rem; letter-spacing: 2.5px; text-decoration: none; text-transform: uppercase; }
 .footer-brand p { color: rgba(255, 253, 248, .6); font-size: .85rem; line-height: 1.7; margin: 18px 0 22px; max-width: 280px; }
 .footer-social { display: flex; gap: 14px; }
@@ -327,6 +327,10 @@ h2 { font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 1.05; }
 .footer-bottom p { font-size: .68rem; letter-spacing: 1.3px; margin: 0; text-transform: uppercase; }
 .footer-legal a { color: rgba(255, 253, 248, .5); text-decoration: none; transition: color .3s ease; }
 .footer-legal a:hover { color: var(--gold); }
+@media (max-width: 1100px) {
+  .footer-top { grid-template-columns: repeat(4, 1fr); gap: 40px; }
+  .footer-brand { grid-column: 1 / -1; }
+}
 
 /* Shared About and Contact page content */
 main:has(.page-content) { min-height: calc(100vh - 70px); }
@@ -338,6 +342,9 @@ main:has(.page-content) { min-height: calc(100vh - 70px); }
 .page-section { margin-bottom: 60px; max-width: 640px; }
 .page-section h2 { color: var(--clay); font-size: 1.55rem; margin-bottom: 20px; }
 .page-section p { font-size: 1rem; margin-bottom: 18px; }
+.page-section ul { color: var(--ink-soft); display: grid; gap: 10px; line-height: 1.8; margin: 0 0 18px; padding-left: 20px; }
+.page-section a { color: var(--clay); }
+.policy-updated { color: var(--ink-soft); font-size: .8rem; letter-spacing: 1.2px; margin: -16px 0 40px; text-transform: uppercase; }
 .contact-detail { color: var(--clay) !important; font-size: 1.1rem !important; letter-spacing: 1px; }
 
 .contact-form { display: grid; gap: 24px; margin-top: 12px; max-width: 560px; }

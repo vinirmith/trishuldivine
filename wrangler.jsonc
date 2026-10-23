@@ -16,7 +16,7 @@
     "SITE_URL": "https://trishuldivine.com",
     // Must be an address on a domain you have verified in Resend.
     "EMAIL_FROM": "Trishul Divine <orders@trishuldivine.com>",
-    "SUPPORT_EMAIL": "Trishuldevine@gmail.com",
+    "SUPPORT_EMAIL": "trishuldivine26@gmail.com",
     // Comma-separated. These addresses get an email for every new paid order.
     "ADMIN_NOTIFY_EMAIL": ""
   }

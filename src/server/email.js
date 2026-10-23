@@ -6,7 +6,7 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
 }[char]));
 
 const siteUrl = (env) => String(env.SITE_URL || 'https://trishuldivine.com').replace(/\/+$/, '');
-const supportEmail = (env) => env.SUPPORT_EMAIL || 'Trishuldevine@gmail.com';
+const supportEmail = (env) => env.SUPPORT_EMAIL || 'trishuldivine26@gmail.com';
 
 const money = (value) => {
   const n = Number(value || 0);

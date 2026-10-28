@@ -649,3 +649,41 @@ body.has-cart-bar { padding-bottom: 72px; }
   .logo-crop { height: 44px; width: 163px; }
   .logo-crop img { left: -13px; top: -8px; width: 186px; }
 }
+
+/* Admin: sizes & prices editor */
+.admin-hint { color: var(--ink-soft); font-size: .8rem; line-height: 1.5; }
+.size-editor { display: grid; gap: 8px; }
+.size-row { align-items: center; background: rgba(255, 255, 255, .5); border: 1px solid rgba(30, 32, 28, .1); border-radius: 12px; display: flex; gap: 12px; min-height: 52px; padding: 6px 10px 6px 14px; }
+.size-check { align-items: center; cursor: pointer; display: flex; flex: 1; gap: 10px; }
+.field .size-check input { accent-color: var(--moss); height: 18px; padding: 0; width: 18px; }
+.field .size-check span { color: var(--ink); font-size: .95rem; letter-spacing: 0; text-transform: none; }
+.field .size-row .size-name { flex: 1; padding: 9px 12px; }
+.size-price-wrap { align-items: center; color: var(--ink-soft); display: flex; gap: 6px; }
+.size-price-wrap[hidden] { display: none; }
+.field .size-row .size-price { padding: 9px 12px; width: 120px; }
+.size-remove { background: transparent; border: 0; color: var(--clay); cursor: pointer; font-size: 1.2rem; line-height: 1; padding: 4px; }
+.size-add { background: transparent; border: 1px dashed rgba(30, 32, 28, .3); border-radius: 12px; color: var(--moss); cursor: pointer; font: inherit; font-size: .85rem; padding: 12px; }
+.size-add:hover { border-color: var(--gold); }
+
+/* Admin: discount codes */
+.admin-discount-form { align-items: end; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 8px; }
+.admin-discount-form select { background: rgba(255, 255, 255, .72); border: 1px solid rgba(30, 32, 28, .14); border-radius: 12px; color: var(--ink); font: inherit; padding: 12px 14px; }
+#discountCode { text-transform: uppercase; }
+.admin-discount-actions { display: flex; gap: 10px; }
+.admin-discount-actions .button { border: 0; cursor: pointer; }
+#adminDiscountsPane .auth-message { margin: 0 0 18px; }
+
+/* Checkout: promo code */
+.promo-form { border-top: 1px solid rgba(30, 32, 28, .08); display: grid; gap: 8px; margin-top: 18px; padding-top: 18px; }
+.promo-label { color: var(--ink-soft); font-size: .68rem; letter-spacing: 1.3px; text-transform: uppercase; }
+.promo-row { display: flex; gap: 10px; }
+.promo-row input { background: rgba(255, 255, 255, .72); border: 1px solid rgba(30, 32, 28, .14); border-radius: 12px; color: var(--ink); flex: 1; font: inherit; min-width: 0; padding: 12px 14px; text-transform: uppercase; width: 0; }
+.promo-row input::placeholder { text-transform: none; }
+.promo-row input:focus { border-color: rgba(198, 164, 103, .8); outline: none; }
+.promo-row .button { align-items: center; border: 0; cursor: pointer; flex: none; padding: 12px 18px; width: auto; }
+.promo-message { color: var(--clay); font-size: .85rem; min-height: 1em; }
+.promo-message.is-success { color: var(--moss); }
+.checkout-sub-row { color: var(--ink-soft); font-size: .92rem; }
+.promo-form + .checkout-sub-row, .checkout-discount-row { border-top: 0; margin-top: 8px; padding-top: 0; }
+.checkout-discount-row { color: var(--moss); }
+.checkout-discount-row[hidden] { display: none; }

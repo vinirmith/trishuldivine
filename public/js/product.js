@@ -54,9 +54,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const images = (product.images && product.images.length ? product.images : ['images/gemstone_beads.jpeg']).map(fixUrl);
   const sizes = Array.isArray(product.sizes) ? product.sizes : [];
   const inStock = product.in_stock !== false;
-  const price = Number(product.price || 0);
+  const { sizePrice, cardPriceText } = window.trishulPricing;
   let current = 0;
   let size = sizes[0] || '';
+  const priceText = () => `&#8377;${sizePrice(product, size).toLocaleString('en-IN')}`;
 
   document.title = `${name} - Trishuldivine`;
 
@@ -76,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="zoom-pane" hidden></div>
       <a class="product-back" href="${escapeHtml(product.category)}.html">&larr; ${escapeHtml(product.category)}</a>
       <h1>${escapeHtml(name)}</h1>
-      <div class="product-price">&#8377;${price.toLocaleString('en-IN')}</div>
+      <div class="product-price">${priceText()}</div>
       <p class="product-tax">Prices are inclusive of all taxes</p>
       ${sizes.length ? `
         <h2 class="product-label">Select Size</h2>
@@ -105,12 +106,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const psizes = Array.isArray(p.sizes) ? p.sizes : [];
         const pbutton = psizes.length > 1
           ? `<button type="button" class="add-to-cart" data-href="product.html?id=${encodeURIComponent(p.id)}">Select size</button>`
-          : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(p.id)}" data-size="${escapeHtml(psizes[0] || '')}" data-name="${escapeHtml(pname)}" data-image="${escapeHtml(img)}" data-price="${p.price || 0}">Add to cart</button>`;
+          : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(p.id)}" data-size="${escapeHtml(psizes[0] || '')}" data-name="${escapeHtml(pname)}" data-image="${escapeHtml(img)}" data-price="${sizePrice(p, psizes[0])}">Add to cart</button>`;
         return `<article class="shop-product-card">
           <a href="product.html?id=${encodeURIComponent(p.id)}" aria-label="View ${escapeHtml(pname)}"><img class="shop-product-image" src="${escapeHtml(img)}" alt="${escapeHtml(pname)}"></a>
           <div class="shop-product-meta">
             <h3><a href="product.html?id=${encodeURIComponent(p.id)}">${escapeHtml(pname)}</a></h3>
-            <div class="shop-product-price">&#8377;${Number(p.price || 0).toLocaleString('en-IN')}</div>
+            <div class="shop-product-price">${cardPriceText(p)}</div>
             ${pbutton}
           </div>
         </article>`;
@@ -133,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     addButton.dataset.name = name;
     addButton.dataset.size = size;
     addButton.dataset.image = images[0];
-    addButton.dataset.price = String(price);
+    addButton.dataset.price = String(sizePrice(product, size));
   };
   syncAddButton();
 
@@ -152,6 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     button.addEventListener('click', () => {
       size = button.dataset.size;
       page.querySelectorAll('.size-option').forEach((b) => b.classList.toggle('selected', b === button));
+      page.querySelector('.product-price').innerHTML = priceText();
       syncAddButton();
     });
   });

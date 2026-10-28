@@ -53,6 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const sanitizeName = (value) => value.replace(/\s+/g, ' ').trim();
 
+  // A size's own price from size_prices, or the product's base price when it has none.
+  const sizePrice = (product, size) => {
+    const own = Number(product.size_prices?.[size]);
+    return own > 0 ? own : Number(product.price) || 0;
+  };
+  const cardPriceText = (product) => {
+    const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+    const prices = sizes.length ? sizes.map((size) => sizePrice(product, size)) : [Number(product.price) || 0];
+    const low = Math.min(...prices);
+    return `${low < Math.max(...prices) ? 'From ' : ''}₹${low.toLocaleString('en-IN')}`;
+  };
+  window.trishulPricing = { sizePrice, cardPriceText };
+
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
@@ -307,12 +320,12 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       <a href="product.html?id=${encodeURIComponent(product.id)}" aria-label="View ${escapeHtml(name)}"><img class="shop-product-image" src="${escapeHtml(image)}" alt="${escapeHtml(name)}"></a>
       <div class="shop-product-meta">
         <h3><a href="product.html?id=${encodeURIComponent(product.id)}">${escapeHtml(name)}</a></h3>
-        <div class="shop-product-price">₹${Number(product.price || 0).toLocaleString('en-IN')}</div>
+        <div class="shop-product-price">${cardPriceText(product)}</div>
         ${sizes ? `<div class="shop-product-sizes">${escapeHtml(sizes)}</div>` : ''}
         ${inStock
           ? (sizeList.length > 1
             ? `<button type="button" class="add-to-cart" data-href="${escapeHtml(productUrl)}">Select size</button>`
-            : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(product.id)}" data-size="${escapeHtml(sizeList[0] || '')}" data-name="${escapeHtml(name)}" data-image="${escapeHtml(image)}" data-price="${product.price || 0}">Add to cart</button>`)
+            : `<button type="button" class="add-to-cart" data-product-id="${escapeHtml(product.id)}" data-size="${escapeHtml(sizeList[0] || '')}" data-name="${escapeHtml(name)}" data-image="${escapeHtml(image)}" data-price="${sizePrice(product, sizeList[0])}">Add to cart</button>`)
           : `<span class="out-of-stock-badge">Out of stock</span>`}
       </div>
     `;
@@ -718,7 +731,7 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       const items = getCart();
       if (!client || !items.length) return { items, problems: [] };
       const ids = [...new Set(items.map((item) => item.product_id))];
-      const { data, error } = await withRetry(() => client.from('products').select('id,name,price,in_stock').in('id', ids));
+      const { data, error } = await withRetry(() => client.from('products').select('id,name,price,sizes,size_prices,in_stock').in('id', ids));
       if (error || !data) return { items, problems: [] };
 
       const byId = new Map(data.map((product) => [product.id, product]));
@@ -730,17 +743,24 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
           problems.push(`${item.name} is no longer available and was removed from your cart.`);
         } else if (product.in_stock === false) {
           problems.push(`${product.name} is out of stock and was removed from your cart.`);
+        } else if ((product.sizes || []).length && !product.sizes.includes(item.size)) {
+          problems.push(`${product.name} (${item.size || 'no size'}) is no longer available in that size and was removed from your cart.`);
         } else {
-          synced.push({ ...item, name: sanitizeName(product.name), unit_price: Number(product.price) || 0 });
+          synced.push({ ...item, name: sanitizeName(product.name), unit_price: sizePrice(product, item.size) });
         }
       });
       saveCart(synced);
       return { items: synced, problems };
     };
 
+    // Promo code confirmed by the server for the current cart: { code, amount }.
+    let appliedDiscount = null;
+
     const renderCheckoutSummary = (items) => {
       const cartList = document.getElementById('checkoutCartItems');
       const total = document.getElementById('checkoutTotal');
+      const subtotalBox = document.getElementById('checkoutSubtotal');
+      const discountRow = document.getElementById('checkoutDiscountRow');
       const emptyState = document.getElementById('checkoutEmpty');
       if (!cartList || !total || !emptyState) return;
 
@@ -748,6 +768,8 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         emptyState.hidden = false;
         cartList.hidden = true;
         total.textContent = '₹0';
+        if (subtotalBox) subtotalBox.textContent = '₹0';
+        if (discountRow) discountRow.hidden = true;
         payButton.disabled = true;
         return;
       }
@@ -759,7 +781,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
           <strong>${inr(Number(item.unit_price || 0) * Number(item.quantity || 1))}</strong>
         </div>
       `).join('');
-      total.textContent = inr(subtotal);
+      const discount = appliedDiscount ? appliedDiscount.amount : 0;
+      if (subtotalBox) subtotalBox.textContent = inr(subtotal);
+      if (discountRow) {
+        discountRow.hidden = !discount;
+        document.getElementById('checkoutDiscountLabel').textContent = appliedDiscount ? `Discount (${appliedDiscount.code})` : 'Discount';
+        document.getElementById('checkoutDiscount').textContent = `−${inr(discount)}`;
+      }
+      total.textContent = inr(subtotal - discount);
       emptyState.hidden = true;
       cartList.hidden = false;
       payButton.disabled = false;
@@ -773,9 +802,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         noticeBox.textContent = problems.join(' ');
         noticeBox.hidden = !problems.length;
       }
+      // Prices may have changed, so ask the server again what the code is worth.
+      if (appliedDiscount) applyPromo(appliedDiscount.code);
     };
-
-    populateCheckoutState();
 
     if (client) {
       client.auth.getSession().then(({ data: { session } }) => {
@@ -815,6 +844,57 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       return { ok: response.ok, status: response.status, data: data || {} };
     };
 
+    const promoForm = document.getElementById('promoForm');
+    const promoInput = document.getElementById('promoInput');
+    const promoMessage = document.getElementById('promoMessage');
+
+    const setPromoMessage = (text, ok) => {
+      if (!promoMessage) return;
+      promoMessage.textContent = text || '';
+      promoMessage.classList.toggle('is-success', !!ok);
+    };
+
+    const cartLines = () => getCart().map((item) => ({ product_id: item.product_id, size: item.size || '', quantity: item.quantity }));
+
+    // The server prices the cart and checks the code; the browser only displays the result.
+    const applyPromo = async (rawCode) => {
+      const code = String(rawCode || '').replace(/\s+/g, '').toUpperCase();
+      if (!code) { setPromoMessage('Enter a promo code.'); return; }
+      const items = cartLines();
+      if (!items.length) { setPromoMessage('Your cart is empty.'); return; }
+      setPromoMessage('Checking code…');
+      try {
+        const result = await requestJson('/payments/quote', { method: 'POST', body: { items, discount_code: code } });
+        if (!result.ok) {
+          appliedDiscount = null;
+          setPromoMessage(result.data.message || 'This promo code could not be applied.');
+        } else {
+          appliedDiscount = { code: result.data.discount_code, amount: Number(result.data.discount_amount) || 0 };
+          if (promoInput) promoInput.value = appliedDiscount.code;
+          setPromoMessage(`${appliedDiscount.code} applied: you save ${inr(appliedDiscount.amount)}.`, true);
+        }
+      } catch (error) {
+        setPromoMessage('Could not check the code. Please try again.');
+      }
+      renderCheckoutSummary(getCart());
+    };
+
+    if (promoForm) {
+      promoForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (paymentOpen || finished) return;
+        applyPromo(promoInput.value);
+      });
+      promoInput.addEventListener('input', () => {
+        // Editing the code drops the applied one until it is applied again.
+        if (appliedDiscount && promoInput.value.replace(/\s+/g, '').toUpperCase() !== appliedDiscount.code) {
+          appliedDiscount = null;
+          setPromoMessage('');
+          renderCheckoutSummary(getCart());
+        }
+      });
+    }
+
     const loadRazorpay = () => new Promise((resolve, reject) => {
       if (window.Razorpay) { resolve(); return; }
       const script = document.createElement('script');
@@ -828,6 +908,8 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
     let pending = null;        // the Razorpay order for the current cart + address, reused on retry
     let paymentOpen = false;
     let finished = false;
+
+    populateCheckoutState();
 
     const showSuccess = (orderNumber, email) => {
       finished = true;
@@ -947,7 +1029,8 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         return;
       }
 
-      const items = getCart().map((item) => ({ product_id: item.product_id, size: item.size || '', quantity: item.quantity }));
+      const items = cartLines();
+      const discountCode = appliedDiscount ? appliedDiscount.code : '';
       if (!items.length) {
         showError('Your cart is empty.');
         return;
@@ -957,13 +1040,19 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       setBusy(true, 'Starting payment…');
       try {
         await loadRazorpay();
-        const signature = JSON.stringify({ items, customer });
+        const signature = JSON.stringify({ items, customer, discountCode });
         if (!pending || pending.signature !== signature) {
-          const result = await requestJson('/payments/create-order', { method: 'POST', body: { items, customer } });
+          const result = await requestJson('/payments/create-order', { method: 'POST', body: { items, customer, discount_code: discountCode } });
           if (!result.ok) {
+            if (/discount/.test(result.data.error || '')) {
+              appliedDiscount = null;
+              setPromoMessage(result.data.message);
+            }
             throw new Error(result.data.message || 'We could not start the payment. Please try again.');
           }
           pending = { signature, checkout: result.data };
+          // Show exactly what the server will charge.
+          document.getElementById('checkoutTotal').textContent = inr(result.data.total_amount);
         }
         setBusy(true, 'Waiting for payment…');
         openPayment(pending.checkout);

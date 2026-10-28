@@ -101,6 +101,23 @@
         <div id="checkoutCartItems" class="checkout-items" hidden></div>
         <div id="checkoutEmpty" class="checkout-empty">Your cart is empty.</div>
 
+        <form id="promoForm" class="promo-form">
+          <label for="promoInput" class="promo-label">Promo code</label>
+          <div class="promo-row">
+            <input type="text" id="promoInput" placeholder="Enter code" autocomplete="off" maxlength="30" />
+            <button type="submit" class="button button-secondary">Apply</button>
+          </div>
+          <p id="promoMessage" class="promo-message" aria-live="polite"></p>
+        </form>
+
+        <div class="checkout-total-row checkout-sub-row">
+          <span>Subtotal</span>
+          <span id="checkoutSubtotal">₹0</span>
+        </div>
+        <div id="checkoutDiscountRow" class="checkout-total-row checkout-sub-row checkout-discount-row" hidden>
+          <span id="checkoutDiscountLabel">Discount</span>
+          <span id="checkoutDiscount"></span>
+        </div>
         <div class="checkout-total-row">
           <span>Total</span>
           <strong id="checkoutTotal">₹0</strong>

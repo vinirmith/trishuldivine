@@ -165,6 +165,51 @@ alter table public.order_items
   add column if not exists product_id uuid references public.products(id) on delete set null,
   add column if not exists size text;
 
+-- Per-size prices, e.g. {"6mm": 390, "8mm": 740}. A size missing here costs products.price.
+alter table public.products
+  add column if not exists size_prices jsonb not null default '{}'::jsonb;
+alter table public.products drop constraint if exists products_size_prices_check;
+alter table public.products add constraint products_size_prices_check
+  check (jsonb_typeof(size_prices) = 'object');
+
+-- ---------------------------------------------------------------------------
+-- Discount codes. Managed by admins in admin.html; validated only on the server.
+-- ---------------------------------------------------------------------------
+create table if not exists public.discount_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text not null,
+  discount_type text not null default 'percent',
+  value numeric(10,2) not null,
+  min_order_amount numeric(10,2) not null default 0,
+  max_uses integer,
+  used_count integer not null default 0,
+  active boolean not null default true,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.discount_codes drop constraint if exists discount_codes_rules_check;
+alter table public.discount_codes add constraint discount_codes_rules_check check (
+  code ~ '^[A-Z0-9_-]{3,30}$'
+  and discount_type in ('percent', 'fixed')
+  and value > 0
+  and (discount_type <> 'percent' or value <= 100)
+  and min_order_amount >= 0
+  and (max_uses is null or max_uses > 0)
+  and used_count >= 0
+);
+create unique index if not exists discount_codes_code_uidx on public.discount_codes (code);
+
+drop trigger if exists discount_codes_set_updated_at on public.discount_codes;
+create trigger discount_codes_set_updated_at
+before update on public.discount_codes
+for each row execute function public.set_updated_at();
+
+alter table public.orders
+  add column if not exists discount_code text,
+  add column if not exists discount_amount numeric(10,2) not null default 0;
+
 create sequence if not exists public.order_number_seq start 1001;
 
 create unique index if not exists orders_order_number_uidx on public.orders (order_number);
@@ -287,6 +332,14 @@ create policy "Admins read refunds" on public.refunds
 create policy "Admins read webhook events" on public.webhook_events
   for select using (public.is_admin());
 
+-- Codes are secret until a customer types one, so only admins can see or change them.
+alter table public.discount_codes enable row level security;
+drop policy if exists "Admins manage discount codes" on public.discount_codes;
+create policy "Admins manage discount codes" on public.discount_codes
+  for all using (public.is_admin()) with check (public.is_admin());
+revoke all on public.discount_codes from anon;
+grant select, insert, update, delete on public.discount_codes to authenticated;
+
 revoke all on public.customers, public.orders, public.order_items, public.payments, public.refunds, public.webhook_events from anon;
 revoke insert, update, delete, truncate, references, trigger
   on public.customers, public.orders, public.order_items, public.payments, public.refunds, public.webhook_events
@@ -299,17 +352,14 @@ grant select on public.customers, public.orders, public.order_items, public.paym
 -- Prices always come from public.products here, never from the browser.
 -- ---------------------------------------------------------------------------
 
--- Creates the customer, order and order lines for a checkout.
-create or replace function public.create_checkout_order(
-  p_items jsonb,
-  p_customer jsonb,
-  p_user_id uuid,
-  p_shipping_fee numeric default 0
-)
+-- Prices a cart from public.products (per-size price when set) and applies an
+-- optional discount code. Used for the checkout preview and by create_checkout_order.
+create or replace function public.price_checkout(p_items jsonb, p_discount_code text default null)
 returns jsonb
 language plpgsql
 security definer
 set search_path = public
+stable
 as $$
 declare
   v_line jsonb;
@@ -318,32 +368,17 @@ declare
   v_pid uuid;
   v_qty integer;
   v_size text;
+  v_price numeric(10,2);
   v_subtotal numeric(10,2) := 0;
-  v_total numeric(10,2);
-  v_shipping numeric(10,2) := greatest(coalesce(p_shipping_fee, 0), 0);
-  v_name text := btrim(coalesce(p_customer->>'full_name', ''));
-  v_phone text := btrim(coalesce(p_customer->>'phone', ''));
-  v_email text := lower(btrim(coalesce(p_customer->>'email', '')));
-  v_address text := btrim(coalesce(p_customer->>'address', ''));
-  v_city text := btrim(coalesce(p_customer->>'city', ''));
-  v_state text := btrim(coalesce(p_customer->>'state', ''));
-  v_pincode text := btrim(coalesce(p_customer->>'pincode', ''));
-  v_country text := btrim(coalesce(p_customer->>'country', 'India'));
-  v_notes text := nullif(btrim(coalesce(p_customer->>'notes', '')), '');
-  v_customer_id uuid;
-  v_order_id uuid;
-  v_number text;
-  v_token uuid;
-  v_details jsonb;
+  v_code text := nullif(upper(btrim(coalesce(p_discount_code, ''))), '');
+  v_discount public.discount_codes%rowtype;
+  v_discount_amount numeric(10,2) := 0;
 begin
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'empty_cart';
   end if;
   if jsonb_array_length(p_items) > 30 then
     raise exception 'too_many_items';
-  end if;
-  if v_name = '' or v_phone = '' or v_email = '' or v_address = '' or v_city = '' or v_state = '' or v_pincode = '' then
-    raise exception 'invalid_customer';
   end if;
 
   for v_line in select * from jsonb_array_elements(p_items) loop
@@ -372,22 +407,99 @@ begin
     else
       v_size := null;
     end if;
-    if v_product.price is null or v_product.price <= 0 then
+    v_price := v_product.price;
+    if v_size is not null and jsonb_typeof(v_product.size_prices -> v_size) = 'number'
+       and (v_product.size_prices ->> v_size)::numeric > 0 then
+      v_price := (v_product.size_prices ->> v_size)::numeric;
+    end if;
+    if v_price is null or v_price <= 0 then
       raise exception 'invalid_price' using detail = v_product.name;
     end if;
 
-    v_subtotal := v_subtotal + v_product.price * v_qty;
+    v_subtotal := v_subtotal + v_price * v_qty;
     v_lines := v_lines || jsonb_build_object(
       'product_id', v_product.id,
       'name', v_product.name,
       'image', coalesce(v_product.images[1], ''),
       'size', v_size,
       'quantity', v_qty,
-      'unit_price', v_product.price
+      'unit_price', v_price
     );
   end loop;
 
-  v_total := v_subtotal + v_shipping;
+  if v_code is not null then
+    select * into v_discount from public.discount_codes where code = v_code;
+    if not found or not v_discount.active
+       or (v_discount.expires_at is not null and v_discount.expires_at <= now())
+       or (v_discount.max_uses is not null and v_discount.used_count >= v_discount.max_uses) then
+      raise exception 'invalid_discount';
+    end if;
+    if v_subtotal < v_discount.min_order_amount then
+      raise exception 'discount_min_order' using detail = v_discount.min_order_amount::text;
+    end if;
+    v_discount_amount := case v_discount.discount_type
+      when 'percent' then round(v_subtotal * v_discount.value / 100)
+      else v_discount.value
+    end;
+    -- Always leave at least ₹1 to pay, so the order can still go through Razorpay.
+    v_discount_amount := greatest(least(v_discount_amount, v_subtotal - 1), 0);
+  end if;
+
+  return jsonb_build_object(
+    'items', v_lines,
+    'subtotal', v_subtotal,
+    'discount_code', case when v_code is not null then v_code end,
+    'discount_amount', v_discount_amount,
+    'total', v_subtotal - v_discount_amount
+  );
+end;
+$$;
+
+-- Creates the customer, order and order lines for a checkout.
+drop function if exists public.create_checkout_order(jsonb, jsonb, uuid, numeric);
+create or replace function public.create_checkout_order(
+  p_items jsonb,
+  p_customer jsonb,
+  p_user_id uuid,
+  p_shipping_fee numeric default 0,
+  p_discount_code text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_priced jsonb;
+  v_lines jsonb;
+  v_subtotal numeric(10,2);
+  v_discount_amount numeric(10,2);
+  v_total numeric(10,2);
+  v_shipping numeric(10,2) := greatest(coalesce(p_shipping_fee, 0), 0);
+  v_name text := btrim(coalesce(p_customer->>'full_name', ''));
+  v_phone text := btrim(coalesce(p_customer->>'phone', ''));
+  v_email text := lower(btrim(coalesce(p_customer->>'email', '')));
+  v_address text := btrim(coalesce(p_customer->>'address', ''));
+  v_city text := btrim(coalesce(p_customer->>'city', ''));
+  v_state text := btrim(coalesce(p_customer->>'state', ''));
+  v_pincode text := btrim(coalesce(p_customer->>'pincode', ''));
+  v_country text := btrim(coalesce(p_customer->>'country', 'India'));
+  v_notes text := nullif(btrim(coalesce(p_customer->>'notes', '')), '');
+  v_customer_id uuid;
+  v_order_id uuid;
+  v_number text;
+  v_token uuid;
+  v_details jsonb;
+begin
+  if v_name = '' or v_phone = '' or v_email = '' or v_address = '' or v_city = '' or v_state = '' or v_pincode = '' then
+    raise exception 'invalid_customer';
+  end if;
+
+  v_priced := public.price_checkout(p_items, p_discount_code);
+  v_lines := v_priced->'items';
+  v_subtotal := (v_priced->>'subtotal')::numeric;
+  v_discount_amount := (v_priced->>'discount_amount')::numeric;
+  v_total := v_subtotal - v_discount_amount + v_shipping;
 
   select id into v_customer_id from public.customers
   where lower(coalesce(email, '')) = v_email
@@ -410,11 +522,11 @@ begin
 
   insert into public.orders (
     customer_id, user_id, status, payment_status, order_number, currency,
-    subtotal, shipping_fee, total_amount, shipping_address, shipping_details, notes
+    subtotal, discount_code, discount_amount, shipping_fee, total_amount, shipping_address, shipping_details, notes
   )
   values (
     v_customer_id, p_user_id, 'pending', 'created', v_number, 'INR',
-    v_subtotal, v_shipping, v_total,
+    v_subtotal, v_priced->>'discount_code', v_discount_amount, v_shipping, v_total,
     concat_ws(', ', v_address, v_city, v_state, v_pincode, v_country),
     v_details, v_notes
   )
@@ -429,6 +541,9 @@ begin
     'order_id', v_order_id,
     'order_number', v_number,
     'public_token', v_token,
+    'subtotal', v_subtotal,
+    'discount_code', v_priced->>'discount_code',
+    'discount_amount', v_discount_amount,
     'total_amount', v_total,
     'currency', 'INR',
     'items', v_lines
@@ -536,6 +651,10 @@ begin
     set payment_status = 'paid', status = 'confirmed', paid_at = now()
     where id = v_order.id;
     v_transitioned := true;
+    -- A code counts as used only once its order is paid.
+    if v_order.discount_code is not null then
+      update public.discount_codes set used_count = used_count + 1 where code = v_order.discount_code;
+    end if;
   end if;
 
   return jsonb_build_object(
@@ -713,7 +832,8 @@ as $$
 $$;
 
 -- Only the service role may run these. (Functions are executable by PUBLIC by default.)
-revoke all on function public.create_checkout_order(jsonb, jsonb, uuid, numeric) from public, anon, authenticated;
+revoke all on function public.price_checkout(jsonb, text) from public, anon, authenticated;
+revoke all on function public.create_checkout_order(jsonb, jsonb, uuid, numeric, text) from public, anon, authenticated;
 revoke all on function public.attach_razorpay_order(uuid, text) from public, anon, authenticated;
 revoke all on function public.get_order_bundle(uuid, text, uuid) from public, anon, authenticated;
 revoke all on function public.mark_order_paid(text, text, bigint, text, jsonb, boolean) from public, anon, authenticated;
@@ -724,7 +844,8 @@ revoke all on function public.finish_webhook_event(text, text, text, text) from 
 revoke all on function public.claim_confirmation_email(uuid, boolean) from public, anon, authenticated;
 revoke all on function public.finish_confirmation_email(uuid, boolean, text) from public, anon, authenticated;
 
-grant execute on function public.create_checkout_order(jsonb, jsonb, uuid, numeric) to service_role;
+grant execute on function public.price_checkout(jsonb, text) to service_role;
+grant execute on function public.create_checkout_order(jsonb, jsonb, uuid, numeric, text) to service_role;
 grant execute on function public.attach_razorpay_order(uuid, text) to service_role;
 grant execute on function public.get_order_bundle(uuid, text, uuid) to service_role;
 grant execute on function public.mark_order_paid(text, text, bigint, text, jsonb, boolean) to service_role;
@@ -759,7 +880,7 @@ begin
       jsonb_build_object('full_name', 'Self Test', 'phone', '9876543210', 'email', 'selftest@example.com',
                          'address', '1 Test Street', 'city', 'Hyderabad', 'state', 'Telangana',
                          'pincode', '500001', 'country', 'India'),
-      null, 0);
+      null, 0, null);
     perform public.attach_razorpay_order((v_created->>'order_id')::uuid, 'order_selftest');
 
     v_paid := public.mark_order_paid('order_selftest', 'pay_selftest', round((v_created->>'total_amount')::numeric * 100)::bigint, 'upi', '{}'::jsonb, true);
@@ -781,6 +902,14 @@ begin
     perform public.record_refund('pay_selftest', 'rfnd_selftest', round((v_created->>'total_amount')::numeric * 100)::bigint, 'processed', '{}'::jsonb);
     if (select payment_status from public.orders where id = v_order.id) <> 'refunded' then
       raise exception 'selftest failed: refund not applied';
+    end if;
+
+    insert into public.discount_codes (code, discount_type, value) values ('SELFTEST10', 'percent', 10);
+    v_again := public.price_checkout(
+      jsonb_build_array(jsonb_build_object('product_id', v_product.id, 'size', v_product.sizes[1], 'quantity', 2)),
+      'selftest10');
+    if (v_again->>'discount_amount')::numeric <> round((v_again->>'subtotal')::numeric * 10 / 100) then
+      raise exception 'selftest failed: discount not applied (%)', v_again;
     end if;
 
     raise exception 'selftest_ok';

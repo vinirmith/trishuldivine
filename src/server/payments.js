@@ -1,4 +1,5 @@
 // Checkout + Razorpay endpoints, served by the Worker under /payments/*.
+//   POST /payments/quote         cart + discount code -> server-priced totals (no order created)
 //   POST /payments/create-order  cart + address -> server-priced order + Razorpay order
 //   POST /payments/verify        browser payment result -> signature check -> order paid
 //   GET  /payments/status        poll an order by its private token
@@ -47,7 +48,7 @@ async function readJson(request, maxChars = 20000) {
 
 const clean = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 
-export function parseCheckout(body) {
+function parseItems(body) {
   const rawItems = Array.isArray(body.items) ? body.items : [];
   if (!rawItems.length) throw new HttpError(400, 'empty_cart', 'Your cart is empty.');
   if (rawItems.length > 30) throw new HttpError(400, 'too_many_items', 'Too many items in the cart.');
@@ -69,7 +70,13 @@ export function parseCheckout(body) {
   if (items.some((item) => item.quantity > 20)) {
     throw new HttpError(400, 'invalid_item', 'You can order at most 20 of one item at a time.');
   }
+  return items;
+}
 
+const parseDiscountCode = (body) => clean(body.discount_code, 40).toUpperCase();
+
+export function parseCheckout(body) {
+  const items = parseItems(body);
   const c = body.customer && typeof body.customer === 'object' ? body.customer : {};
   const bad = (message) => { throw new HttpError(400, 'invalid_customer', message); };
 
@@ -98,6 +105,7 @@ export function parseCheckout(body) {
 
   return {
     items,
+    discountCode: parseDiscountCode(body),
     customer: {
       full_name, phone: digits, email, address, city, state, pincode, country: 'India',
       notes: clean(c.notes, 500),
@@ -114,6 +122,18 @@ const CHECKOUT_ERRORS = {
   out_of_stock: [409, (name) => `${name || 'An item in your cart'} is out of stock. Please remove it to continue.`],
   invalid_size: [409, (name) => `Please choose a valid size for ${name || 'an item in your cart'}.`],
   invalid_price: [409, (name) => `${name || 'An item'} is not available for purchase right now.`],
+  invalid_discount: [409, () => 'This promo code is not valid or has expired.'],
+  discount_min_order: [409, (min) => `This promo code needs a minimum order of ₹${Number(min || 0).toLocaleString('en-IN')}.`],
+};
+
+const checkoutRpc = async (env, fn, params) => {
+  try {
+    return await rpc(env, fn, params);
+  } catch (err) {
+    const mapped = err instanceof SupabaseError ? CHECKOUT_ERRORS[err.message] : null;
+    if (mapped) throw new HttpError(mapped[0], err.message, mapped[1](err.details));
+    throw err;
+  }
 };
 
 const bearerToken = (request) => {
@@ -122,9 +142,24 @@ const bearerToken = (request) => {
 };
 
 // ---------------------------------------------------------------------------
+async function quote(request, env) {
+  assertConfigured(env, ['SUPABASE_SERVICE_ROLE_KEY']);
+  const body = await readJson(request);
+  const priced = await checkoutRpc(env, 'price_checkout', {
+    p_items: parseItems(body), p_discount_code: parseDiscountCode(body) || null,
+  });
+  return json({
+    items: priced.items,
+    subtotal: priced.subtotal,
+    discount_code: priced.discount_code,
+    discount_amount: priced.discount_amount,
+    total_amount: priced.total,
+  });
+}
+
 async function createOrder(request, env) {
   assertConfigured(env);
-  const { items, customer } = parseCheckout(await readJson(request));
+  const { items, customer, discountCode } = parseCheckout(await readJson(request));
 
   let userId = null;
   const token = bearerToken(request);
@@ -132,16 +167,10 @@ async function createOrder(request, env) {
     try { userId = (await getUserFromToken(env, token))?.id || null; } catch (err) { console.warn('token lookup failed', err.message); }
   }
 
-  let created;
-  try {
-    created = await rpc(env, 'create_checkout_order', {
-      p_items: items, p_customer: customer, p_user_id: userId, p_shipping_fee: 0,
-    });
-  } catch (err) {
-    const mapped = err instanceof SupabaseError ? CHECKOUT_ERRORS[err.message] : null;
-    if (mapped) throw new HttpError(mapped[0], err.message, mapped[1](err.details));
-    throw err;
-  }
+  const created = await checkoutRpc(env, 'create_checkout_order', {
+    p_items: items, p_customer: customer, p_user_id: userId, p_shipping_fee: 0,
+    p_discount_code: discountCode || null,
+  });
 
   const amount = Math.round(Number(created.total_amount) * 100);
   if (!Number.isInteger(amount) || amount < 100) {
@@ -174,6 +203,9 @@ async function createOrder(request, env) {
     currency: 'INR',
     order_number: created.order_number,
     public_token: created.public_token,
+    subtotal: created.subtotal,
+    discount_code: created.discount_code,
+    discount_amount: created.discount_amount,
     total_amount: created.total_amount,
     description: `Order ${created.order_number}`,
     prefill: { name: customer.full_name, email: customer.email, contact: `+91${customer.phone}` },
@@ -417,6 +449,7 @@ export async function handlePayments(request, env, ctx) {
   const route = `${request.method} ${url.pathname.replace(/\/+$/, '')}`;
   try {
     switch (route) {
+      case 'POST /payments/quote': return await quote(request, env);
       case 'POST /payments/create-order': return await createOrder(request, env);
       case 'POST /payments/verify': return await verifyPayment(request, env, ctx);
       case 'GET /payments/status': return await orderStatus(url, env);

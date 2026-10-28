@@ -14,11 +14,14 @@ create table if not exists public.products (
   price numeric(10,2) not null default 0,
   category text not null,
   sizes text[] not null default '{}',
+  size_prices jsonb not null default '{}'::jsonb, -- {"6mm": 390}; sizes not listed cost price
   images text[] not null default '{}',
   in_stock boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.products add column if not exists size_prices jsonb not null default '{}'::jsonb;
 
 create index if not exists products_category_idx on public.products (category);
 create index if not exists products_in_stock_idx on public.products (in_stock);

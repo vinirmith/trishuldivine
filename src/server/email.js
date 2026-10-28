@@ -52,6 +52,7 @@ const totalsHtml = (order) => {
   const row = (label, value, strong) => `<tr><td style="padding:4px 0;color:${strong ? '#1e201c' : '#61645b'};font-size:${strong ? 16 : 14}px;${strong ? 'font-weight:600;' : ''}">${label}</td><td style="padding:4px 0;text-align:right;color:#1e201c;font-size:${strong ? 16 : 14}px;${strong ? 'font-weight:600;' : ''}">${value}</td></tr>`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
     ${row('Subtotal', money(order.subtotal ?? order.total_amount))}
+    ${Number(order.discount_amount) > 0 ? row(`Discount (${esc(order.discount_code)})`, `−${money(order.discount_amount)}`) : ''}
     ${row('Shipping', Number(order.shipping_fee) > 0 ? money(order.shipping_fee) : 'Free')}
     ${row('Total paid', money(order.total_amount), true)}
   </table>`;
@@ -106,6 +107,7 @@ export function buildCustomerEmail(env, bundle) {
     itemsText(items),
     '',
     `Subtotal: ${money(order.subtotal ?? order.total_amount)}`,
+    Number(order.discount_amount) > 0 ? `Discount (${order.discount_code}): -${money(order.discount_amount)}` : '',
     `Shipping: ${Number(order.shipping_fee) > 0 ? money(order.shipping_fee) : 'Free'}`,
     `Total paid: ${money(order.total_amount)}${method ? ` (${method})` : ''}`,
     payment?.razorpay_payment_id ? `Payment reference: ${payment.razorpay_payment_id}` : '',

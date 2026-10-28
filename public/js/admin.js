@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fieldDescription.setRangeText(next, start, end, 'select');
     fieldDescription.focus();
   });
-  const fieldSizes = document.getElementById('fieldSizes');
+  const sizeEditor = document.getElementById('sizeEditor');
+  const sizeAddButton = document.getElementById('sizeAdd');
   const fieldImageFiles = document.getElementById('fieldImageFiles');
   const imagePreview = document.getElementById('adminImagePreview');
   const fieldInStock = document.getElementById('fieldInStock');
@@ -72,6 +73,19 @@ document.addEventListener('DOMContentLoaded', () => {
   let newImageFiles = []; // File objects staged for upload on save
 
   const inr = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+
+  // A size's own price from size_prices, or the product's base price when it has none.
+  const sizePrice = (product, size) => {
+    const own = Number(product.size_prices?.[size]);
+    return own > 0 ? own : Number(product.price) || 0;
+  };
+  const priceLabel = (product) => {
+    const sizes = product.sizes || [];
+    const prices = sizes.length ? sizes.map((s) => sizePrice(product, s)) : [Number(product.price) || 0];
+    const low = Math.min(...prices);
+    const high = Math.max(...prices);
+    return low === high ? inr(low) : `${inr(low)} – ${inr(high)}`;
+  };
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -123,13 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     listBody.innerHTML = filtered.map((p) => {
       const thumb = (p.images && p.images[0]) || 'images/gemstone_beads.jpeg';
-      const sizes = (p.sizes && p.sizes.length) ? p.sizes.join(', ') : '—';
+      const sizes = (p.sizes && p.sizes.length) ? p.sizes.map((s) => `${s} ${inr(sizePrice(p, s))}`).join(', ') : '—';
       return `
         <tr data-id="${p.id}">
           <td><img class="admin-thumb" src="${escapeHtml(thumb)}" alt="${escapeHtml(p.name)}"></td>
           <td>${escapeHtml(p.name)}</td>
           <td>${escapeHtml(p.category)}</td>
-          <td>${inr(p.price)}</td>
+          <td>${priceLabel(p)}</td>
           <td>${escapeHtml(sizes)}</td>
           <td>
             <label class="switch">
@@ -176,6 +190,51 @@ document.addEventListener('DOMContentLoaded', () => {
     imagePreview.innerHTML = savedThumbs.join('') + newThumbs.join('');
   };
 
+  // Sizes & prices: preset sizes are ticked on/off, extra sizes are added with "+ Add size".
+  const PRESET_SIZES = ['6mm', '8mm', 'Free size'];
+
+  const sizeRowHtml = (name, price, { preset = false, checked = true } = {}) => `
+    <div class="size-row" ${preset ? `data-size="${escapeHtml(name)}"` : ''}>
+      ${preset
+        ? `<label class="size-check"><input type="checkbox" class="size-enabled" ${checked ? 'checked' : ''}><span>${escapeHtml(name)}</span></label>`
+        : '<input type="text" class="size-name" placeholder="Size, e.g. 10mm" maxlength="40">'}
+      <label class="size-price-wrap" ${checked ? '' : 'hidden'}>₹<input type="number" class="size-price" min="0" step="0.01" placeholder="Price" value="${price > 0 ? price : ''}" aria-label="Price for this size"></label>
+      ${preset ? '' : '<button type="button" class="size-remove" aria-label="Remove size">×</button>'}
+    </div>`;
+
+  const renderSizeEditor = (sizes = [], prices = {}) => {
+    const priceOf = (size) => Number(prices?.[size]) || 0;
+    const custom = sizes.filter((size) => !PRESET_SIZES.includes(size));
+    sizeEditor.innerHTML = PRESET_SIZES.map((size) => sizeRowHtml(size, priceOf(size), { preset: true, checked: sizes.includes(size) })).join('')
+      + custom.map((size) => sizeRowHtml(size, priceOf(size))).join('');
+    // Custom names are set as values (not markup) so any characters are kept exactly.
+    sizeEditor.querySelectorAll('.size-name').forEach((input, i) => { input.value = custom[i]; });
+  };
+
+  const readSizeEditor = () => {
+    const sizes = [];
+    const sizePrices = {};
+    sizeEditor.querySelectorAll('.size-row').forEach((row) => {
+      const enabled = row.querySelector('.size-enabled');
+      if (enabled && !enabled.checked) return;
+      const name = (enabled ? row.dataset.size : row.querySelector('.size-name').value).replace(/\s+/g, ' ').trim();
+      if (!name) return;
+      if (sizes.includes(name)) throw new Error(`The size "${name}" is listed twice.`);
+      sizes.push(name);
+      const price = Number(row.querySelector('.size-price').value);
+      if (price > 0) sizePrices[name] = price;
+    });
+    return { sizes, sizePrices };
+  };
+
+  // When a size is switched on, ask for its price, starting from the base price.
+  const askSizePrice = (row) => {
+    const input = row.querySelector('.size-price');
+    if (!input.value && Number(fieldPrice.value) > 0) input.value = fieldPrice.value;
+    input.focus();
+    input.select();
+  };
+
   const resetForm = () => {
     productForm.reset();
     fieldId.value = '';
@@ -184,6 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formMessage.textContent = '';
     fieldInStock.checked = true;
     fieldInStockLabel.textContent = 'In stock';
+    renderSizeEditor();
     renderImagePreview();
   };
 
@@ -196,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
       fieldPrice.value = product.price || 0;
       fieldCategory.value = product.category || '';
       fieldDescription.value = product.description || '';
-      fieldSizes.value = (product.sizes || []).join(', ');
+      renderSizeEditor(product.sizes || [], product.size_prices || {});
       fieldInStock.checked = !!product.in_stock;
       fieldInStockLabel.textContent = product.in_stock ? 'In stock' : 'Out of stock';
       currentImages = [...(product.images || [])];
@@ -262,24 +322,32 @@ document.addEventListener('DOMContentLoaded', () => {
     saveButton.disabled = true;
 
     try {
+      const { sizes, sizePrices } = readSizeEditor();
+      // With no base price, the cheapest size price stands in for it (shown on cards as "From ₹…").
+      const ownPrices = Object.values(sizePrices);
+      const price = Number(fieldPrice.value) || (ownPrices.length ? Math.min(...ownPrices) : 0);
+      if (!fieldName.value.trim() || !fieldCategory.value.trim()) {
+        formMessage.textContent = 'Name and category are required.';
+        return;
+      }
+      if (!(Number(fieldPrice.value) > 0) && (!sizes.length || sizes.some((size) => !sizePrices[size]))) {
+        formMessage.textContent = 'Enter a base price, or a price for every size.';
+        return;
+      }
+
       const uploadedUrls = await uploadStagedImages();
       const images = [...currentImages, ...uploadedUrls];
 
       const payload = {
         name: fieldName.value.trim(),
-        price: Number(fieldPrice.value) || 0,
+        price,
         category: fieldCategory.value.trim().toLowerCase(),
         description: fieldDescription.value.trim(),
-        sizes: fieldSizes.value.split(',').map((s) => s.trim()).filter(Boolean),
+        sizes,
+        size_prices: sizePrices,
         images,
         in_stock: fieldInStock.checked,
       };
-
-      if (!payload.name || !payload.category) {
-        formMessage.textContent = 'Name and category are required.';
-        saveButton.disabled = false;
-        return;
-      }
 
       const editingId = fieldId.value;
       const { error } = editingId
@@ -404,6 +472,26 @@ document.addEventListener('DOMContentLoaded', () => {
   formCancel.addEventListener('click', closeForm);
   formOverlay.addEventListener('click', (event) => {
     if (event.target === formOverlay) closeForm();
+  });
+
+  sizeEditor.addEventListener('change', (event) => {
+    const toggle = event.target.closest('.size-enabled');
+    if (!toggle) return;
+    const row = toggle.closest('.size-row');
+    row.querySelector('.size-price-wrap').hidden = !toggle.checked;
+    if (toggle.checked) askSizePrice(row);
+  });
+
+  sizeEditor.addEventListener('click', (event) => {
+    const remove = event.target.closest('.size-remove');
+    if (remove) remove.closest('.size-row').remove();
+  });
+
+  sizeAddButton.addEventListener('click', () => {
+    sizeEditor.insertAdjacentHTML('beforeend', sizeRowHtml('', 0));
+    const row = sizeEditor.lastElementChild;
+    if (Number(fieldPrice.value) > 0) row.querySelector('.size-price').value = fieldPrice.value;
+    row.querySelector('.size-name').focus();
   });
 
   fieldInStock.addEventListener('change', () => {
@@ -620,8 +708,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     productsPane.hidden = tab !== 'products';
     ordersPane.hidden = tab !== 'orders';
+    discountsPane.hidden = tab !== 'discounts';
     if (tab === 'orders') loadOrders();
     else refreshBadge();
+    if (tab === 'discounts') loadDiscounts();
   };
 
   const stopOrdersPolling = () => {
@@ -698,6 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <h4 class="admin-detail-heading">Items</h4>
       <table class="admin-detail-items">
         ${items.map((item) => `<tr><td>${escapeHtml(item.product_name)}${item.size ? ` <span class="admin-muted">(${escapeHtml(item.size)})</span>` : ''}</td><td>${escapeHtml(item.quantity)} × ${inr(item.unit_price)}</td><td class="num">${inr(Number(item.unit_price) * Number(item.quantity))}</td></tr>`).join('') || '<tr><td colspan="3" class="admin-muted">No items.</td></tr>'}
+        ${Number(order.discount_amount) > 0 ? `<tr class="total"><td colspan="2">Discount (${escapeHtml(order.discount_code)})</td><td class="num">−${inr(order.discount_amount)}</td></tr>` : ''}
         <tr class="total"><td colspan="2">Shipping</td><td class="num">${Number(order.shipping_fee) > 0 ? inr(order.shipping_fee) : 'Free'}</td></tr>
         <tr class="total"><td colspan="2"><strong>Total</strong></td><td class="num"><strong>${inr(order.total_amount)}</strong></td></tr>
       </table>
@@ -750,6 +841,161 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   };
+
+  // ---------------------------------------------------------------------------
+  // Discount codes (checked and applied by the server at checkout)
+  // ---------------------------------------------------------------------------
+  const discountsPane = document.getElementById('adminDiscountsPane');
+  const discountForm = document.getElementById('discountForm');
+  const discountId = document.getElementById('discountId');
+  const discountCode = document.getElementById('discountCode');
+  const discountType = document.getElementById('discountType');
+  const discountValue = document.getElementById('discountValue');
+  const discountMinOrder = document.getElementById('discountMinOrder');
+  const discountMaxUses = document.getElementById('discountMaxUses');
+  const discountExpires = document.getElementById('discountExpires');
+  const discountSave = document.getElementById('discountSave');
+  const discountCancel = document.getElementById('discountCancel');
+  const discountMessage = document.getElementById('discountMessage');
+  const discountStatus = document.getElementById('discountStatus');
+  const discountList = document.getElementById('discountList');
+  let allDiscounts = [];
+
+  const discountLabel = (d) => (d.discount_type === 'percent' ? `${Number(d.value)}% off` : `${inr(d.value)} off`);
+  const formatDay = (iso) => new Date(iso).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
+  const isoDay = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // yyyy-mm-dd for <input type="date">
+
+  const renderDiscounts = () => {
+    discountStatus.textContent = `${allDiscounts.length} code${allDiscounts.length === 1 ? '' : 's'}`;
+    if (!allDiscounts.length) {
+      discountList.innerHTML = '<tr><td colspan="7" class="admin-empty-row">No discount codes yet. Add one above.</td></tr>';
+      return;
+    }
+    discountList.innerHTML = allDiscounts.map((d) => {
+      const expired = d.expires_at && new Date(d.expires_at) <= new Date();
+      const usedUp = d.max_uses && d.used_count >= d.max_uses;
+      return `
+        <tr>
+          <td><strong>${escapeHtml(d.code)}</strong></td>
+          <td>${escapeHtml(discountLabel(d))}</td>
+          <td>${Number(d.min_order_amount) > 0 ? inr(d.min_order_amount) : '—'}</td>
+          <td>${escapeHtml(d.used_count)}${d.max_uses ? ` / ${escapeHtml(d.max_uses)}` : ''}${usedUp ? ' <span class="admin-pill is-warn">Used up</span>' : ''}</td>
+          <td>${d.expires_at ? escapeHtml(formatDay(d.expires_at)) : 'Never'}${expired ? ' <span class="admin-pill is-bad">Expired</span>' : ''}</td>
+          <td>
+            <label class="switch">
+              <input type="checkbox" class="discount-toggle" data-id="${escapeHtml(d.id)}" ${d.active ? 'checked' : ''}>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </td>
+          <td class="admin-row-actions">
+            <button type="button" class="text-button discount-edit" data-id="${escapeHtml(d.id)}">Edit</button>
+            <button type="button" class="text-button admin-delete-btn discount-delete" data-id="${escapeHtml(d.id)}">Delete</button>
+          </td>
+        </tr>`;
+    }).join('');
+  };
+
+  const loadDiscounts = async () => {
+    discountStatus.textContent = 'Loading…';
+    const { data, error } = await client.from('discount_codes').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Load discount codes failed:', error);
+      discountStatus.textContent = 'Could not load discount codes. Make sure supabase/payments-setup.sql has been run.';
+      return;
+    }
+    allDiscounts = data || [];
+    renderDiscounts();
+  };
+
+  const resetDiscountForm = () => {
+    discountForm.reset();
+    discountId.value = '';
+    discountSave.textContent = 'Add code';
+    discountCancel.hidden = true;
+  };
+
+  const editDiscount = (d) => {
+    discountId.value = d.id;
+    discountCode.value = d.code;
+    discountType.value = d.discount_type;
+    discountValue.value = Number(d.value);
+    discountMinOrder.value = Number(d.min_order_amount) || '';
+    discountMaxUses.value = d.max_uses || '';
+    discountExpires.value = d.expires_at ? isoDay(d.expires_at) : '';
+    discountSave.textContent = 'Save code';
+    discountCancel.hidden = false;
+    discountMessage.textContent = '';
+    discountCode.focus();
+  };
+
+  discountForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const code = discountCode.value.replace(/\s+/g, '').toUpperCase();
+    const value = Number(discountValue.value);
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) {
+      discountMessage.textContent = 'Codes are 3–30 letters or numbers (- and _ allowed), no spaces.';
+      return;
+    }
+    if (!(value > 0) || (discountType.value === 'percent' && value > 100)) {
+      discountMessage.textContent = discountType.value === 'percent' ? 'Enter a percentage between 1 and 100.' : 'Enter the amount to take off.';
+      return;
+    }
+    const payload = {
+      code,
+      discount_type: discountType.value,
+      value,
+      min_order_amount: Number(discountMinOrder.value) || 0,
+      max_uses: Number(discountMaxUses.value) > 0 ? Math.floor(Number(discountMaxUses.value)) : null,
+      // The code works until the end of the chosen day, Indian time.
+      expires_at: discountExpires.value ? `${discountExpires.value}T23:59:59+05:30` : null,
+    };
+
+    discountSave.disabled = true;
+    discountMessage.textContent = 'Saving…';
+    const { error } = discountId.value
+      ? await client.from('discount_codes').update(payload).eq('id', discountId.value)
+      : await client.from('discount_codes').insert([payload]);
+    discountSave.disabled = false;
+    if (error) {
+      console.error('Save discount code failed:', error);
+      discountMessage.textContent = error.code === '23505' ? `The code ${code} already exists.` : (error.message || 'Could not save this code.');
+      return;
+    }
+    discountMessage.textContent = `${code} saved.`;
+    resetDiscountForm();
+    await loadDiscounts();
+  });
+
+  discountCancel.addEventListener('click', () => {
+    resetDiscountForm();
+    discountMessage.textContent = '';
+  });
+
+  discountList.addEventListener('click', async (event) => {
+    const edit = event.target.closest('.discount-edit');
+    if (edit) {
+      const d = allDiscounts.find((x) => x.id === edit.dataset.id);
+      if (d) editDiscount(d);
+      return;
+    }
+    const remove = event.target.closest('.discount-delete');
+    if (remove) {
+      const d = allDiscounts.find((x) => x.id === remove.dataset.id);
+      if (!d || !confirm(`Delete the code ${d.code}? Customers will no longer be able to use it.`)) return;
+      const { error } = await client.from('discount_codes').delete().eq('id', d.id);
+      if (error) alert(error.message || 'Could not delete this code.');
+      if (discountId.value === d.id) resetDiscountForm();
+      await loadDiscounts();
+    }
+  });
+
+  discountList.addEventListener('change', async (event) => {
+    const toggle = event.target.closest('.discount-toggle');
+    if (!toggle) return;
+    const { error } = await client.from('discount_codes').update({ active: toggle.checked }).eq('id', toggle.dataset.id);
+    if (error) alert(error.message || 'Could not update this code.');
+    await loadDiscounts();
+  });
 
   tabButtons.forEach((button) => button.addEventListener('click', () => setTab(button.dataset.tab)));
   orderSearch.addEventListener('input', renderOrders);

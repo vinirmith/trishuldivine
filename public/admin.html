@@ -60,6 +60,7 @@
       <div class="admin-tabs" role="tablist">
         <button type="button" class="admin-tab is-active" role="tab" data-tab="products" aria-selected="true">Products</button>
         <button type="button" class="admin-tab" role="tab" data-tab="orders" aria-selected="false">Orders <span id="adminOrdersBadge" class="admin-badge" hidden></span></button>
+        <button type="button" class="admin-tab" role="tab" data-tab="discounts" aria-selected="false">Discounts</button>
       </div>
 
       <div id="adminProductsPane">
@@ -147,6 +148,62 @@
         </div>
       </div>
 
+      <div id="adminDiscountsPane" hidden>
+        <form id="discountForm" class="admin-discount-form">
+          <input type="hidden" id="discountId" />
+          <label class="field">
+            <span>Code</span>
+            <input type="text" id="discountCode" placeholder="DIWALI10" maxlength="30" autocomplete="off" required />
+          </label>
+          <label class="field">
+            <span>Type</span>
+            <select id="discountType">
+              <option value="percent">% off</option>
+              <option value="fixed">₹ off</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Value</span>
+            <input type="number" id="discountValue" min="1" step="1" placeholder="10" required />
+          </label>
+          <label class="field">
+            <span>Min order (₹)</span>
+            <input type="number" id="discountMinOrder" min="0" step="1" placeholder="0" />
+          </label>
+          <label class="field">
+            <span>Usage limit</span>
+            <input type="number" id="discountMaxUses" min="1" step="1" placeholder="Unlimited" />
+          </label>
+          <label class="field">
+            <span>Expires on</span>
+            <input type="date" id="discountExpires" />
+          </label>
+          <div class="admin-discount-actions">
+            <button type="submit" id="discountSave" class="button button-gold">Add code</button>
+            <button type="button" id="discountCancel" class="button button-secondary" hidden>Cancel</button>
+          </div>
+        </form>
+        <p id="discountMessage" class="auth-message" aria-live="polite"></p>
+
+        <p id="discountStatus" class="admin-list-status"></p>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Discount</th>
+                <th>Min order</th>
+                <th>Used</th>
+                <th>Expires</th>
+                <th>Active</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="discountList"></tbody>
+          </table>
+        </div>
+      </div>
+
     </section>
 
   </main>
@@ -168,8 +225,8 @@
 
         <div class="field-grid two-col">
           <label class="field">
-            <span>Price (₹)</span>
-            <input type="number" id="fieldPrice" name="price" min="0" step="0.01" required />
+            <span>Base price (₹)</span>
+            <input type="number" id="fieldPrice" name="price" min="0" step="0.01" />
           </label>
           <label class="field">
             <span>Category</span>
@@ -187,10 +244,12 @@
           <textarea id="fieldDescription" name="description" rows="8" placeholder="Product description. Use B for bold and List for bullet points."></textarea>
         </label>
 
-        <label class="field">
-          <span>Sizes (comma separated)</span>
-          <input type="text" id="fieldSizes" name="sizes" placeholder="6 in, 7 in, 8 in" />
-        </label>
+        <div class="field">
+          <span>Sizes &amp; prices</span>
+          <p class="admin-hint">Tick a size and enter its price. A size left without a price sells at the base price.</p>
+          <div id="sizeEditor" class="size-editor"></div>
+          <button type="button" id="sizeAdd" class="size-add">+ Add size</button>
+        </div>
 
         <label class="field">
           <span>Images</span>

@@ -1,5 +1,6 @@
 // Checkout + Razorpay endpoints, served by the Worker under /payments/*.
 //   POST /payments/quote         cart + discount code -> server-priced totals (no order created)
+//   POST /payments/shipping-quote cart + pincode -> shipping fee (cheapest Shiprocket courier)
 //   POST /payments/create-order  cart + address -> server-priced order + Razorpay order
 //   POST /payments/verify        browser payment result -> signature check -> order paid
 //   GET  /payments/status        poll an order by its private token
@@ -11,6 +12,7 @@ import {
   verifyPaymentSignature, verifyWebhookSignature, sha256Hex,
 } from './razorpay.js';
 import { buildCustomerEmail, buildAdminEmail, sendEmail } from './email.js';
+import { shippingQuote, pushOrderToShiprocket, ShippingError } from './shipping.js';
 
 class HttpError extends Error {
   constructor(status, code, message) {
@@ -157,9 +159,19 @@ async function quote(request, env) {
   });
 }
 
+async function quoteShipping(request, env) {
+  const body = await readJson(request);
+  const items = parseItems(body);
+  const pincode = clean(body.pincode, 10);
+  if (!/^[1-9]\d{5}$/.test(pincode)) throw new HttpError(400, 'invalid_pincode', 'Please enter a valid 6-digit pincode.');
+  return json(await shippingQuote(env, { items, pincode }));
+}
+
 async function createOrder(request, env) {
   assertConfigured(env);
   const { items, customer, discountCode } = parseCheckout(await readJson(request));
+  // The fee is worked out here from the delivery pincode, never taken from the browser.
+  const { shipping_fee: shippingFee } = await shippingQuote(env, { items, pincode: customer.pincode });
 
   let userId = null;
   const token = bearerToken(request);
@@ -168,7 +180,7 @@ async function createOrder(request, env) {
   }
 
   const created = await checkoutRpc(env, 'create_checkout_order', {
-    p_items: items, p_customer: customer, p_user_id: userId, p_shipping_fee: 0,
+    p_items: items, p_customer: customer, p_user_id: userId, p_shipping_fee: shippingFee,
     p_discount_code: discountCode || null,
   });
 
@@ -206,6 +218,7 @@ async function createOrder(request, env) {
     subtotal: created.subtotal,
     discount_code: created.discount_code,
     discount_amount: created.discount_amount,
+    shipping_fee: shippingFee,
     total_amount: created.total_amount,
     description: `Order ${created.order_number}`,
     prefill: { name: customer.full_name, email: customer.email, contact: `+91${customer.phone}` },
@@ -276,7 +289,7 @@ async function verifyPayment(request, env, ctx) {
     throw new HttpError(409, 'amount_mismatch', `We received a payment that does not match order ${result.order_number}. Please contact us with this order number.`);
   }
 
-  ctx.waitUntil(sendOrderEmails(env, result.order_id).catch((err) => console.error('Order email failed', result.order_number, err.message)));
+  afterPaid(env, ctx, result);
   return json({ ok: true, status: 'paid', order_number: result.order_number });
 }
 
@@ -288,6 +301,13 @@ async function orderStatus(url, env) {
   if (!bundle) throw new HttpError(404, 'order_not_found', 'Order not found.');
   return json({ order_number: bundle.order.order_number, payment_status: bundle.order.payment_status });
 }
+
+// Background work once an order is paid. Both steps are claimed in the database,
+// so verify, the webhook and retries can all call this safely.
+const afterPaid = (env, ctx, result) => {
+  ctx.waitUntil(sendOrderEmails(env, result.order_id).catch((err) => console.error('Order email failed', result.order_number, err.message)));
+  ctx.waitUntil(pushOrderToShiprocket(env, result.order_id).catch((err) => console.error('Shiprocket push failed', result.order_number, err.message)));
+};
 
 // ---------------------------------------------------------------------------
 // Emails: the claim in the database guarantees one send per order, however many
@@ -368,8 +388,8 @@ async function processWebhookEvent(env, ctx, type, event) {
         console.error('Amount mismatch from webhook', p.order_id, p.id, p.amount);
         return { status: 'failed', error: 'amount_mismatch' };
       }
-      // Also covers an order that was paid in the browser but whose email never went out.
-      ctx.waitUntil(sendOrderEmails(env, result.order_id).catch((err) => console.error('Order email failed', result.order_number, err.message)));
+      // Also covers an order that was paid in the browser but whose email or Shiprocket push never went out.
+      afterPaid(env, ctx, result);
       return { status: 'processed' };
     }
 
@@ -450,6 +470,7 @@ export async function handlePayments(request, env, ctx) {
   try {
     switch (route) {
       case 'POST /payments/quote': return await quote(request, env);
+      case 'POST /payments/shipping-quote': return await quoteShipping(request, env);
       case 'POST /payments/create-order': return await createOrder(request, env);
       case 'POST /payments/verify': return await verifyPayment(request, env, ctx);
       case 'GET /payments/status': return await orderStatus(url, env);
@@ -458,7 +479,7 @@ export async function handlePayments(request, env, ctx) {
       default: return json({ error: 'not_found' }, 404);
     }
   } catch (err) {
-    if (err instanceof HttpError) return json({ error: err.code, message: err.message }, err.status);
+    if (err instanceof HttpError || err instanceof ShippingError) return json({ error: err.code, message: err.message }, err.status);
     console.error('Unhandled payments error', route, err?.stack || err);
     return json({ error: 'server_error', message: 'Something went wrong. Please try again.' }, 500);
   }

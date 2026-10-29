@@ -9,7 +9,8 @@
   "observability": { "enabled": true },
   // Non-secret settings. Secrets (never put these here) are set with `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
-  //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY
+  //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY,
+  //   SHIPROCKET_EMAIL, SHIPROCKET_PASSWORD (Shiprocket API user), SHIPROCKET_WEBHOOK_TOKEN
   // See docs/PAYMENTS_SETUP.md.
   "vars": {
     "SUPABASE_URL": "https://acnhzuiisexsiuondawt.supabase.co",
@@ -18,6 +19,10 @@
     "EMAIL_FROM": "Trishul Divine <orders@trishuldivine.com>",
     "SUPPORT_EMAIL": "trishuldivine26@gmail.com",
     // Comma-separated. These addresses get an email for every new paid order.
-    "ADMIN_NOTIFY_EMAIL": ""
+    "ADMIN_NOTIFY_EMAIL": "",
+    // Shiprocket pickup address: the nickname saved in Shiprocket → Settings → Pickup Addresses,
+    // and its pincode (used to price couriers at checkout).
+    "SHIPROCKET_PICKUP_LOCATION": "Primary",
+    "SHIPROCKET_PICKUP_PINCODE": "521185"
   }
 }

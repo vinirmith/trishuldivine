@@ -1,7 +1,8 @@
 // Serves the static site, handles checkout/payment endpoints (/payments/*, see
-// src/server/payments.js) and forwards /api/* to Supabase so browsers only talk to
+// src/server/payments.js), Shiprocket shipping (/shipping/*, src/server/shipping.js) and forwards /api/* to Supabase so browsers only talk to
 // trishuldivine.com (some ISPs block *.supabase.co directly).
 import { handlePayments } from './server/payments.js';
+import { handleShipping } from './server/shipping.js';
 
 const SUPABASE_HOST = 'acnhzuiisexsiuondawt.supabase.co';
 
@@ -11,6 +12,9 @@ export default {
 
     if (url.pathname === '/payments' || url.pathname.startsWith('/payments/')) {
       return handlePayments(request, env, ctx);
+    }
+    if (url.pathname.startsWith('/shipping/')) {
+      return handleShipping(request, env, ctx);
     }
 
     if (url.pathname !== '/api' && !url.pathname.startsWith('/api/')) {

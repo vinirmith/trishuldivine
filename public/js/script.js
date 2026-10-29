@@ -755,12 +755,15 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
 
     // Promo code confirmed by the server for the current cart: { code, amount }.
     let appliedDiscount = null;
+    // Shipping fee from the server for the current cart + pincode: { key, fee } (null = not known yet).
+    let shippingQuote = null;
 
     const renderCheckoutSummary = (items) => {
       const cartList = document.getElementById('checkoutCartItems');
       const total = document.getElementById('checkoutTotal');
       const subtotalBox = document.getElementById('checkoutSubtotal');
       const discountRow = document.getElementById('checkoutDiscountRow');
+      const shippingBox = document.getElementById('checkoutShipping');
       const emptyState = document.getElementById('checkoutEmpty');
       if (!cartList || !total || !emptyState) return;
 
@@ -770,6 +773,7 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         total.textContent = '₹0';
         if (subtotalBox) subtotalBox.textContent = '₹0';
         if (discountRow) discountRow.hidden = true;
+        if (shippingBox) shippingBox.textContent = '—';
         payButton.disabled = true;
         return;
       }
@@ -788,7 +792,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
         document.getElementById('checkoutDiscountLabel').textContent = appliedDiscount ? `Discount (${appliedDiscount.code})` : 'Discount';
         document.getElementById('checkoutDiscount').textContent = `−${inr(discount)}`;
       }
-      total.textContent = inr(subtotal - discount);
+      const shipping = shippingQuote ? shippingQuote.fee : 0;
+      if (shippingBox) shippingBox.textContent = !shippingQuote ? 'Enter pincode' : (shipping ? inr(shipping) : 'Free');
+      total.textContent = inr(subtotal - discount + shipping);
       emptyState.hidden = true;
       cartList.hidden = false;
       payButton.disabled = false;
@@ -804,6 +810,7 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       }
       // Prices may have changed, so ask the server again what the code is worth.
       if (appliedDiscount) applyPromo(appliedDiscount.code);
+      refreshShipping();
     };
 
     if (client) {
@@ -878,6 +885,50 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       }
       renderCheckoutSummary(getCart());
     };
+
+    // Shipping depends on the delivery pincode and the parcel weight (number of items).
+    const shippingNote = document.getElementById('shippingNote');
+    const pincodeInput = checkoutForm.querySelector('[name="pincode"]');
+    let shippingRequest = 0;
+
+    const setShippingNote = (text) => {
+      if (!shippingNote) return;
+      shippingNote.textContent = text || '';
+      shippingNote.hidden = !text;
+    };
+
+    const refreshShipping = async () => {
+      const pincode = (pincodeInput?.value || '').trim();
+      const items = cartLines();
+      const key = JSON.stringify({ pincode, items });
+      if (shippingQuote && shippingQuote.key === key) return;
+      shippingQuote = null;
+      setShippingNote('');
+      if (!/^[1-9]\d{5}$/.test(pincode) || !items.length) { renderCheckoutSummary(getCart()); return; }
+
+      const requestId = ++shippingRequest;
+      document.getElementById('checkoutShipping').textContent = 'Checking…';
+      try {
+        const result = await requestJson('/payments/shipping-quote', { method: 'POST', body: { items, pincode } });
+        if (requestId !== shippingRequest) return; // a newer pincode was typed meanwhile
+        if (result.ok) {
+          shippingQuote = { key, fee: Number(result.data.shipping_fee) || 0 };
+          if (result.data.estimated_days) setShippingNote(`Estimated delivery in ${result.data.estimated_days} days.`);
+        } else {
+          setShippingNote(result.data.message || 'We could not work out delivery charges for this pincode.');
+        }
+      } catch (error) {
+        if (requestId === shippingRequest) setShippingNote('Could not check delivery charges. Please try again.');
+      }
+      renderCheckoutSummary(getCart());
+    };
+
+    if (pincodeInput) {
+      pincodeInput.addEventListener('input', () => {
+        pincodeInput.value = pincodeInput.value.replace(/\D/g, '').slice(0, 6);
+        refreshShipping();
+      });
+    }
 
     if (promoForm) {
       promoForm.addEventListener('submit', (event) => {
@@ -1048,10 +1099,13 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
               appliedDiscount = null;
               setPromoMessage(result.data.message);
             }
+            if (result.data.error === 'not_serviceable') setShippingNote(result.data.message);
             throw new Error(result.data.message || 'We could not start the payment. Please try again.');
           }
           pending = { signature, checkout: result.data };
           // Show exactly what the server will charge.
+          const fee = Number(result.data.shipping_fee) || 0;
+          document.getElementById('checkoutShipping').textContent = fee ? inr(fee) : 'Free';
           document.getElementById('checkoutTotal').textContent = inr(result.data.total_amount);
         }
         setBusy(true, 'Waiting for payment…');

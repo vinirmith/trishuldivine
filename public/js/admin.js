@@ -594,6 +594,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return '<span class="admin-pill is-muted">Sending</span>';
   };
 
+  // Shipping: first whether the paid order reached Shiprocket, then what tracking says.
+  const shippingBadge = (order) => {
+    if (order.payment_status !== 'paid') return '<span class="admin-pill is-muted">—</span>';
+    if (order.delivered_at) return '<span class="admin-pill is-good">Delivered</span>';
+    if (order.shipped_at) return `<span class="admin-pill is-good">${escapeHtml(order.tracking_status || 'Shipped')}</span>`;
+    if (order.shiprocket_push_status === 'sent') return `<span class="admin-pill is-warn">${escapeHtml(order.tracking_status || 'Ready to ship')}</span>`;
+    if (order.shiprocket_push_status === 'failed') return '<span class="admin-pill is-bad">Not in Shiprocket</span>';
+    return '<span class="admin-pill is-muted">Not sent</span>';
+  };
+
   const itemsSummary = (orderId) => {
     const items = orderItemsById.get(orderId) || [];
     if (!items.length) return '—';
@@ -617,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ordersStatus.textContent = `${rows.length} order${rows.length === 1 ? '' : 's'}${limited}${stamp}`;
 
     if (!rows.length) {
-      orderList.innerHTML = '<tr><td colspan="8" class="admin-empty-row">No orders match these filters.</td></tr>';
+      orderList.innerHTML = '<tr><td colspan="9" class="admin-empty-row">No orders match these filters.</td></tr>';
       return;
     }
 
@@ -631,6 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${itemsSummary(order.id)}</td>
           <td>${inr(order.total_amount)}</td>
           <td>${paymentBadge(order.payment_status)}</td>
+          <td>${shippingBadge(order)}</td>
           <td>${emailBadge(order)}</td>
           <td class="admin-row-actions"><button type="button" class="text-button admin-order-view" data-id="${escapeHtml(order.id)}">View</button></td>
         </tr>`;
@@ -666,7 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (!dbAdmin) {
         allOrders = [];
-        orderList.innerHTML = '<tr><td colspan="8" class="admin-empty-row">This login is not an admin in the database, so orders cannot be shown. Add this email with supabase/admin-setup.sql.</td></tr>';
+        orderList.innerHTML = '<tr><td colspan="9" class="admin-empty-row">This login is not an admin in the database, so orders cannot be shown. Add this email with supabase/admin-setup.sql.</td></tr>';
         ordersStatus.textContent = '';
         return;
       }
@@ -793,6 +804,22 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr class="total"><td colspan="2"><strong>Total</strong></td><td class="num"><strong>${inr(order.total_amount)}</strong></td></tr>
       </table>
 
+      ${order.payment_status === 'paid' ? `
+        <h4 class="admin-detail-heading">Shipping</h4>
+        <dl class="admin-detail-list">
+          ${detailRow('Status', shippingBadge(order))}
+          ${order.courier_name ? detailRow('Courier', escapeHtml(order.courier_name)) : ''}
+          ${order.awb_code ? detailRow('AWB', `<a href="https://shiprocket.co/tracking/${encodeURIComponent(order.awb_code)}" target="_blank" rel="noopener">${escapeHtml(order.awb_code)}</a>`) : ''}
+          ${order.expected_delivery ? detailRow('Expected', escapeHtml(order.expected_delivery)) : ''}
+          ${order.shipped_at ? detailRow('Shipped', escapeHtml(formatDate(order.shipped_at))) : ''}
+          ${order.delivered_at ? detailRow('Delivered', escapeHtml(formatDate(order.delivered_at))) : ''}
+          ${order.shiprocket_order_id ? detailRow('Shiprocket', `Order ${escapeHtml(order.shiprocket_order_id)} · <a href="https://app.shiprocket.in/seller/orders/new" target="_blank" rel="noopener">Open Shiprocket</a>`) : ''}
+          ${order.shiprocket_error ? detailRow('Last error', `<span class="admin-muted">${escapeHtml(order.shiprocket_error)}</span>`) : ''}
+        </dl>
+        ${['pending', 'failed'].includes(order.shiprocket_push_status || 'pending') ? `
+          <button type="button" class="button button-secondary admin-push-shiprocket">${order.shiprocket_push_status === 'failed' ? 'Retry sending to Shiprocket' : 'Send to Shiprocket'}</button>
+          <p id="orderShipMessage" class="auth-message" aria-live="polite"></p>` : ''}` : ''}
+
       <h4 class="admin-detail-heading">Payments</h4>
       ${payments.length ? payments.map((p) => `
         <div class="admin-detail-payment">
@@ -816,6 +843,28 @@ document.addEventListener('DOMContentLoaded', () => {
         event.target.textContent = 'Copied';
       } catch (err) {
         event.target.textContent = 'Copy failed';
+      }
+    });
+
+    orderDetailBody.querySelector('.admin-push-shiprocket')?.addEventListener('click', async (event) => {
+      const button = event.target;
+      const message = document.getElementById('orderShipMessage');
+      button.disabled = true;
+      message.textContent = 'Sending to Shiprocket…';
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        const response = await fetch('/shipping/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+          body: JSON.stringify({ order_id: id }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'Could not send this order to Shiprocket.');
+        await loadOrders({ silent: true });
+        if (openOrderId === id) openOrderDetail(id);
+      } catch (err) {
+        message.textContent = err.message || 'Could not send this order to Shiprocket.';
+        button.disabled = false;
       }
     });
 

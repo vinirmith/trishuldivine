@@ -124,6 +124,47 @@ export function buildCustomerEmail(env, bundle) {
   return { subject, html, text };
 }
 
+export function buildShippedEmail(env, bundle, trackUrl) {
+  const { order, items } = bundle;
+  const details = order.shipping_details || {};
+  const first = esc(String(details.full_name || 'there').split(' ')[0]);
+  const subject = `Your order ${order.order_number} has shipped | ${BRAND}`;
+  const eta = order.expected_delivery ? when(order.expected_delivery).split(',')[0] : '';
+
+  const html = shell(env, subject, `
+    <p style="margin:0 0 6px;color:#ad7655;font-size:12px;letter-spacing:2px;text-transform:uppercase;">On its way</p>
+    <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-weight:normal;font-size:28px;color:#1e201c;">Good news, ${first}.</h1>
+    <p style="margin:0 0 20px;color:#61645b;font-size:15px;line-height:1.7;">Your order ${esc(order.order_number)} has left us and is with the courier.${eta ? ` Expected delivery: <strong style="color:#1e201c;">${esc(eta)}</strong>.` : ''}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f0e7;border-radius:10px;margin-bottom:22px;">
+      <tr><td style="padding:14px 16px;font-size:14px;color:#61645b;">Courier<br><strong style="font-size:15px;color:#1e201c;">${esc(order.courier_name || '—')}</strong></td>
+          <td style="padding:14px 16px;font-size:14px;color:#61645b;text-align:right;">Tracking number<br><strong style="font-size:15px;color:#1e201c;">${esc(order.awb_code || '—')}</strong></td></tr>
+    </table>
+    ${trackUrl ? `<p style="margin:0 0 24px;"><a href="${esc(trackUrl)}" style="display:inline-block;background:#1e201c;color:#fffdf8;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;letter-spacing:1.2px;text-transform:uppercase;">Track your parcel</a></p>` : ''}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${itemsHtml(env, items)}</table>
+    <h2 style="margin:26px 0 8px;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;color:#61645b;font-weight:600;">Delivering to</h2>
+    <p style="margin:0;color:#1e201c;font-size:15px;line-height:1.7;">${addressLines(details).map(esc).join('<br>')}</p>`);
+
+  const text = [
+    `Good news, ${String(details.full_name || 'there').split(' ')[0]}.`,
+    '',
+    `Your order ${order.order_number} has shipped.`,
+    `Courier: ${order.courier_name || '-'}`,
+    `Tracking number: ${order.awb_code || '-'}`,
+    trackUrl ? `Track it: ${trackUrl}` : '',
+    eta ? `Expected delivery: ${eta}` : '',
+    '',
+    itemsText(items),
+    '',
+    'Delivering to:',
+    ...addressLines(details),
+    '',
+    `Questions? Write to ${supportEmail(env)}.`,
+    BRAND,
+  ].join('\n');
+
+  return { subject, html, text };
+}
+
 export function buildAdminEmail(env, bundle) {
   const { order, items, payment } = bundle;
   const details = order.shipping_details || {};

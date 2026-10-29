@@ -639,7 +639,8 @@ body.has-cart-bar { padding-bottom: 72px; }
 .admin-detail-payment { border-top: 1px solid rgba(30, 32, 28, .08); display: grid; gap: 4px; padding: 10px 0; }
 .admin-resend-email { border: 0; cursor: pointer; margin-top: 4px; }
 @media (max-width: 700px) { .admin-tab { padding: 12px 12px; } .admin-detail-row { grid-template-columns: 1fr; gap: 2px; } }
-#ordersRefresh, .admin-resend-email { width: auto; }
+#ordersRefresh, .admin-resend-email, .admin-push-shiprocket { width: auto; }
+.admin-push-shiprocket { border: 0; cursor: pointer; margin-top: 10px; }
 .field input, .field textarea { min-width: 0; width: 100%; }
 
 /* Header logo: logo.png has transparent margins, so it is cropped to the artwork. */
@@ -684,6 +685,8 @@ body.has-cart-bar { padding-bottom: 72px; }
 .promo-message { color: var(--clay); font-size: .85rem; min-height: 1em; }
 .promo-message.is-success { color: var(--moss); }
 .checkout-sub-row { color: var(--ink-soft); font-size: .92rem; }
-.promo-form + .checkout-sub-row, .checkout-discount-row { border-top: 0; margin-top: 8px; padding-top: 0; }
+.promo-form + .checkout-sub-row, .checkout-discount-row, .checkout-shipping-row { border-top: 0; margin-top: 8px; padding-top: 0; }
+.checkout-shipping-note { margin-top: 6px; }
+.checkout-shipping-note[hidden] { display: none; }
 .checkout-discount-row { color: var(--moss); }
 .checkout-discount-row[hidden] { display: none; }

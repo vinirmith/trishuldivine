@@ -84,6 +84,25 @@ Note: `wrangler deploy` replaces plain variables with the ones in `wrangler.json
 - **Out of stock** is the `in_stock` switch per product (there are no stock counts yet). Out-of-stock items are rejected at checkout and removed from carts.
 - **Troubleshooting:** Cloudflare dashboard → Workers → trishuldivine → Logs (observability is on). Failed webhooks are listed in `webhook_events` with the error.
 
+## Shipping (Shiprocket)
+
+How it works:
+1. **Checkout fee.** When the customer types a 6-digit pincode, `/payments/shipping-quote` asks Shiprocket for courier rates from `SHIPROCKET_PICKUP_PINCODE` to that pincode (100 g per item, box 10x10x5 cm, prepaid) and charges the **cheapest** courier, rounded up to the rupee. `create-order` works the fee out again on the server, so the browser can never change it. Unserviceable pincodes are refused with a message. **Until the Shiprocket secrets are set, shipping is free** and checkout works as before.
+2. **After payment.** The paid order is created in Shiprocket automatically (`order_id` = our order number, e.g. `TD-1042`). If that fails, the order shows "Not in Shiprocket" in Admin → Orders with the error and a **Retry sending to Shiprocket** button.
+3. **You ship from the Shiprocket panel:** pick the courier, generate the label, schedule the pickup.
+4. **Tracking.** Shiprocket's webhook (`/shipping/webhook`) updates the order: courier, AWB, status. The first time the parcel is picked up / in transit the order becomes **shipped** and the customer gets a "your order has shipped" email with a tracking link; on delivery it becomes **delivered**.
+
+Setup:
+1. Sign up at shiprocket.in, finish KYC, recharge the wallet.
+2. Settings → **Pickup Addresses**: add your pickup address. Put its nickname in `SHIPROCKET_PICKUP_LOCATION` and its pincode in `SHIPROCKET_PICKUP_PINCODE` (`wrangler.jsonc`, currently `Primary` / `521185`).
+3. Settings → **API** → Configure → **Create an API user** (a separate email from your login). Add these Cloudflare **Secrets**: `SHIPROCKET_EMAIL` and `SHIPROCKET_PASSWORD` (the API user), and `SHIPROCKET_WEBHOOK_TOKEN` (any long random text).
+4. Settings → **API** → **Webhooks**: URL `https://trishuldivine.com/shipping/webhook`, token = the same `SHIPROCKET_WEBHOOK_TOKEN`, enable it.
+5. Run `supabase/shipping-setup.sql` in the Supabase SQL editor (after `payments-setup.sql`). It ends with a self-test.
+6. Deploy, place a test order to a real pincode, and check it appears in Shiprocket → Orders.
+
+Tracking events are logged in `webhook_events` with source `shiprocket`.
+
 ## Not included yet (next steps)
-- Shiprocket shipping + tracking emails (next phase).
-- GST invoice PDF, COD, shipping fees (the database already has `shipping_fee`; it is `0` for now) and delivery outside India (checkout is India-only).
+- GST invoice PDF, COD and delivery outside India (checkout is India-only).
+- Free-shipping threshold (e.g. free above ₹999) — easy to add on top of the Shiprocket rate.
+- Booking the courier / label / pickup from our admin (done in the Shiprocket panel for now).

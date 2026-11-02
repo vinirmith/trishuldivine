@@ -112,11 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const panel = document.getElementById('cartPanel');
     if (!panel) return;
 
-    const form = panel.querySelector('.checkout-form');
     const status = panel.querySelector('.cart-status');
     const checkoutButton = panel.querySelector('.cart-checkout');
 
-    if (form) form.hidden = false;
     if (status) {
       status.hidden = true;
       status.classList.remove('is-success');
@@ -149,9 +147,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const cartSummary = panel.querySelector('.cart-summary');
     if (!cartList || !cartSummary) return;
 
+    const lineTotal = (item) => (Number(item.unit_price) || 0) * (Number(item.quantity) || 1);
+    const subtotal = items.reduce((sum, item) => sum + lineTotal(item), 0);
+    cartSummary.querySelector('.cart-summary-count').textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+    cartSummary.querySelector('.cart-summary-total').textContent = subtotal ? `₹${subtotal.toLocaleString('en-IN')}` : '';
+
     if (!items.length) {
       cartList.innerHTML = '<p class="cart-empty">Your cart is empty.</p>';
-      cartSummary.textContent = '0 items';
       const checkout = panel.querySelector('.cart-checkout');
       if (checkout) checkout.disabled = true;
       return;
@@ -171,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span>${item.quantity}</span>
               <button class="cart-qty-button" data-action="increase" data-key="${escapeHtml(lineKey(item))}" type="button">+</button>
             </div>
+            ${lineTotal(item) ? `<strong class="cart-item-price">₹${lineTotal(item).toLocaleString('en-IN')}</strong>` : ''}
           </div>
         </div>
       </div>
@@ -178,7 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const checkout = panel.querySelector('.cart-checkout');
     if (checkout) checkout.disabled = false;
-    cartSummary.textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
   };
 
   const addToCart = (product) => {
@@ -221,28 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <button class="cart-close" type="button" aria-label="Close cart">×</button>
       </div>
       <div class="cart-items"></div>
-      <div class="checkout-form">
-        <label>
-          Full name
-          <input type="text" name="full_name" placeholder="Your full name" />
-        </label>
-        <label>
-          Phone
-          <input type="tel" name="phone" placeholder="Phone number" />
-        </label>
-        <label>
-          Email
-          <input type="email" name="email" placeholder="Email address" />
-        </label>
-        <label>
-          Address
-          <textarea name="address" rows="3" placeholder="Shipping address"></textarea>
-        </label>
-      </div>
       <div class="cart-status" hidden></div>
       <div class="cart-footer">
-        <div class="cart-summary">0 items</div>
-        <button class="button button-gold cart-checkout" type="button">Continue Payment</button>
+        <div class="cart-summary"><span class="cart-summary-count">0 items</span><strong class="cart-summary-total"></strong></div>
+        <p class="cart-footer-note">Delivery details and shipping are added at checkout.</p>
+        <button class="button button-gold cart-checkout" type="button">Checkout</button>
       </div>
     `;
 

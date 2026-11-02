@@ -37,7 +37,9 @@ async function request(method, path, { token, body, query } = {}) {
 
 async function getToken(env, { fresh = false } = {}) {
   if (!fresh && cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
-  const data = await request('POST', '/auth/login', { body: { email: env.SHIPROCKET_EMAIL, password: env.SHIPROCKET_PASSWORD } });
+  // Trimmed: values pasted into the Cloudflare dashboard can carry a stray space or newline.
+  const credentials = { email: String(env.SHIPROCKET_EMAIL).trim(), password: String(env.SHIPROCKET_PASSWORD).trim() };
+  const data = await request('POST', '/auth/login', { body: credentials });
   if (!data?.token) throw new ShiprocketError(401, { message: 'Shiprocket login returned no token' });
   cachedToken = { value: data.token, expiresAt: Date.now() + TOKEN_TTL_MS };
   return cachedToken.value;

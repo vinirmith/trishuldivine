@@ -94,7 +94,7 @@ How it works:
 
 Setup:
 1. Sign up at shiprocket.in, finish KYC, recharge the wallet.
-2. Settings → **Pickup Addresses**: add your pickup address. Put its nickname in `SHIPROCKET_PICKUP_LOCATION` and its pincode in `SHIPROCKET_PICKUP_PINCODE` (`wrangler.jsonc`, currently `Primary` / `521185`).
+2. Settings → **Pickup Addresses**: add your pickup address. Put its nickname in `SHIPROCKET_PICKUP_LOCATION` and its pincode in `SHIPROCKET_PICKUP_PINCODE` (`wrangler.jsonc`, currently `Home` / `521185`).
 3. Settings → **API** → Configure → **Create an API user** (a separate email from your login). Add these Cloudflare **Secrets**: `SHIPROCKET_EMAIL` and `SHIPROCKET_PASSWORD` (the API user), and `SHIPROCKET_WEBHOOK_TOKEN` (any long random text).
 4. Settings → **API** → **Webhooks**: URL `https://trishuldivine.com/shipping/webhook`, token = the same `SHIPROCKET_WEBHOOK_TOKEN`, enable it.
 5. Run `supabase/shipping-setup.sql` in the Supabase SQL editor (after `payments-setup.sql`). It ends with a self-test.

@@ -9,11 +9,17 @@ export class RazorpayError extends Error {
   }
 }
 
+// Keys pasted into the Cloudflare dashboard can carry a stray space or newline; Razorpay's
+// API tolerates that but an HMAC signature check does not, so always use trimmed values.
+const keyId = (env) => String(env.RAZORPAY_KEY_ID || '').trim();
+const keySecret = (env) => String(env.RAZORPAY_KEY_SECRET || '').trim();
+const webhookSecret = (env) => String(env.RAZORPAY_WEBHOOK_SECRET || '').trim();
+
 async function call(env, method, path, body) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: {
-      Authorization: `Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,
+      Authorization: `Basic ${btoa(`${keyId(env)}:${keySecret(env)}`)}`,
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -54,13 +60,13 @@ export function safeEqual(a, b) {
 
 // Checkout success: HMAC_SHA256(order_id + "|" + payment_id, key_secret)
 export async function verifyPaymentSignature(env, orderId, paymentId, signature) {
-  const expected = await hmacHex(env.RAZORPAY_KEY_SECRET, `${orderId}|${paymentId}`);
+  const expected = await hmacHex(keySecret(env), `${orderId}|${paymentId}`);
   return safeEqual(expected, String(signature || '').toLowerCase());
 }
 
 // Webhook: HMAC_SHA256(raw request body, webhook_secret)
 export async function verifyWebhookSignature(env, rawBody, signature) {
-  if (!env.RAZORPAY_WEBHOOK_SECRET || !signature) return false;
-  const expected = await hmacHex(env.RAZORPAY_WEBHOOK_SECRET, rawBody);
+  if (!webhookSecret(env) || !signature) return false;
+  const expected = await hmacHex(webhookSecret(env), rawBody);
   return safeEqual(expected, String(signature).toLowerCase());
 }

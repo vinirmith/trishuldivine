@@ -975,7 +975,7 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       setBusy(true, 'Confirming payment…');
       showError('');
       let confirmed = false;
-      let rejected = false;
+      let rejectedMessage = '';
       try {
         const result = await requestJson('/payments/verify', { method: 'POST', body: {
           razorpay_order_id: response.razorpay_order_id,
@@ -983,12 +983,14 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
           razorpay_signature: response.razorpay_signature,
         } });
         confirmed = result.ok && result.data.status === 'paid';
-        rejected = !result.ok && result.status >= 400 && result.status < 500 && result.status !== 429;
-        if (rejected) showError(`${result.data.message || 'We could not confirm your payment.'} Your order number is ${checkout.order_number}. If money was deducted, please contact us with this number.`);
+        if (!result.ok && result.status >= 400 && result.status < 500 && result.status !== 429) {
+          rejectedMessage = result.data.message || 'We could not confirm your payment.';
+        }
       } catch (error) { /* network problem: fall through to polling */ }
 
-      // The server also learns about the payment from Razorpay directly, so give it a moment.
-      if (!confirmed && !rejected) confirmed = await pollUntilPaid(checkout, 8);
+      // The server also learns about the payment from Razorpay directly (webhook), so even
+      // when this browser's confirmation is refused, check whether the order got paid.
+      if (!confirmed) confirmed = await pollUntilPaid(checkout, rejectedMessage ? 5 : 8);
 
       if (confirmed) {
         showSuccess(checkout.order_number, checkout.prefill?.email);
@@ -996,9 +998,9 @@ panel.querySelector('.cart-checkout').addEventListener('click', async () => {
       }
       setBusy(false);
       paymentOpen = false;
-      if (!rejected) {
-        showError(`We received your payment details but are still confirming order ${checkout.order_number}. Please do not pay again. You will get an email shortly, or contact us with this order number.`);
-      }
+      showError(rejectedMessage
+        ? `${rejectedMessage} Your order number is ${checkout.order_number}. If money was deducted, please contact us with this number.`
+        : `We received your payment details but are still confirming order ${checkout.order_number}. Please do not pay again. You will get an email shortly, or contact us with this order number.`);
     };
 
     const openPayment = (checkout) => {

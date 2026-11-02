@@ -209,7 +209,7 @@ async function createOrder(request, env) {
   await rpc(env, 'attach_razorpay_order', { p_order_id: created.order_id, p_razorpay_order_id: razorpayOrder.id });
 
   return json({
-    key_id: env.RAZORPAY_KEY_ID,
+    key_id: String(env.RAZORPAY_KEY_ID).trim(),
     razorpay_order_id: razorpayOrder.id,
     amount,
     currency: 'INR',

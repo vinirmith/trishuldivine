@@ -71,8 +71,23 @@ async function call(env, method, path, options = {}) {
 
 export const parcelWeightKg = (quantity) => Math.round(Math.max(1, quantity) * ITEM_WEIGHT_KG * 1000) / 1000;
 
+// Rates are cached briefly per pincode and weight, so repeated quotes (including
+// abusive ones) don't each hit the shared Shiprocket account.
+const RATE_CACHE_MS = 15 * 60 * 1000;
+const rateCache = new Map(); // `${pincode}:${weightKg}` -> { rate, expiresAt }
+
 // Cheapest prepaid courier to a pincode, or null when no courier serves it.
 export async function cheapestRate(env, { pincode, weightKg }) {
+  const cacheKey = `${pincode}:${weightKg}`;
+  const cached = rateCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.rate;
+  const rate = await lookupCheapestRate(env, { pincode, weightKg });
+  if (rateCache.size >= 500) rateCache.delete(rateCache.keys().next().value);
+  rateCache.set(cacheKey, { rate, expiresAt: Date.now() + RATE_CACHE_MS });
+  return rate;
+}
+
+async function lookupCheapestRate(env, { pincode, weightKg }) {
   let data;
   try {
     data = await call(env, 'GET', '/courier/serviceability/', {

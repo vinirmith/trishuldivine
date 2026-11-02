@@ -7,9 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const client = getSupabaseClient();
-  const allowedAdminEmails = Array.isArray(window.ADMIN_ALLOWED_EMAILS)
-    ? window.ADMIN_ALLOWED_EMAILS.map((email) => String(email || '').trim().toLowerCase())
-    : [];
 
   const loginSection = document.getElementById('adminLogin');
   const deniedSection = document.getElementById('adminDenied');
@@ -90,11 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
-
-  const isAllowedAdminEmail = (email) => {
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    return normalizedEmail && allowedAdminEmails.includes(normalizedEmail);
-  };
 
   const showOnly = (section) => {
     [loginSection, deniedSection, dashboardSection].forEach((el) => {
@@ -400,15 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const signedInEmail = (session.user?.email || '').trim().toLowerCase();
-    const emailAllowed = isAllowedAdminEmail(signedInEmail);
-
-    if (emailAllowed) {
-      showOnly(dashboardSection);
-      await loadProducts();
-      return;
-    }
-
+    // The database admin list (public.admin_users) decides who is an admin.
     const { data: isAdmin, error } = await client.rpc('is_admin');
     if (error) {
       console.error('is_admin check failed:', error);
@@ -799,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <h4 class="admin-detail-heading">Items</h4>
       <table class="admin-detail-items">
         ${items.map((item) => `<tr><td>${escapeHtml(item.product_name)}${item.size ? ` <span class="admin-muted">(${escapeHtml(item.size)})</span>` : ''}</td><td>${escapeHtml(item.quantity)} × ${inr(item.unit_price)}</td><td class="num">${inr(Number(item.unit_price) * Number(item.quantity))}</td></tr>`).join('') || '<tr><td colspan="3" class="admin-muted">No items.</td></tr>'}
-        ${Number(order.discount_amount) > 0 ? `<tr class="total"><td colspan="2">Discount (${escapeHtml(order.discount_code)})</td><td class="num">−${inr(order.discount_amount)}</td></tr>` : ''}
+        ${Number(order.discount_amount) > 0 ? `<tr class="total"><td colspan="2">Discount (${escapeHtml(order.discount_code)})${order.discount_overused ? '<br><span class="admin-warning">Code was already used up, switched off or expired when this order was paid. Review it.</span>' : ''}</td><td class="num">−${inr(order.discount_amount)}</td></tr>` : ''}
         <tr class="total"><td colspan="2">Shipping</td><td class="num">${Number(order.shipping_fee) > 0 ? inr(order.shipping_fee) : 'Free'}</td></tr>
         <tr class="total"><td colspan="2"><strong>Total</strong></td><td class="num"><strong>${inr(order.total_amount)}</strong></td></tr>
       </table>

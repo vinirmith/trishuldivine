@@ -10,7 +10,7 @@ public/                  The website. Cloudflare serves exactly this folder (not
   *.html                 Pages: index, about, contact, bracelets, rudraksha, mala, product, checkout, auth, admin
   css/style.css          All styles
   js/                    script.js (shop, cart, checkout), product.js, admin.js,
-                         supabase-config.js, admin-config.js (admin allow-list)
+                         supabase-config.js
   images/                Product photos. Do not rename or move files inside: product image
                          paths such as images/Bracelet/azurite.jpg are stored in the database.
     brand/logo.png       Header logo

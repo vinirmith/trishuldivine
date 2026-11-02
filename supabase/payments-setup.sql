@@ -208,7 +208,10 @@ for each row execute function public.set_updated_at();
 
 alter table public.orders
   add column if not exists discount_code text,
-  add column if not exists discount_amount numeric(10,2) not null default 0;
+  add column if not exists discount_amount numeric(10,2) not null default 0,
+  -- Set when an order is paid after its code was used up, switched off or expired
+  -- (several unpaid checkouts can hold the same code). Shown to the admin for review.
+  add column if not exists discount_overused boolean not null default false;
 
 create sequence if not exists public.order_number_seq start 1001;
 
@@ -651,9 +654,17 @@ begin
     set payment_status = 'paid', status = 'confirmed', paid_at = now()
     where id = v_order.id;
     v_transitioned := true;
-    -- A code counts as used only once its order is paid.
+    -- A code counts as used only once its order is paid, so the limit is re-checked
+    -- here: unpaid checkouts made earlier may all hold the same limited code.
     if v_order.discount_code is not null then
-      update public.discount_codes set used_count = used_count + 1 where code = v_order.discount_code;
+      update public.discount_codes set used_count = used_count + 1
+      where code = v_order.discount_code
+        and active
+        and (expires_at is null or expires_at > now())
+        and (max_uses is null or used_count < max_uses);
+      if not found then
+        update public.orders set discount_overused = true where id = v_order.id;
+      end if;
     end if;
   end if;
 
@@ -910,6 +921,25 @@ begin
       'selftest10');
     if (v_again->>'discount_amount')::numeric <> round((v_again->>'subtotal')::numeric * 10 / 100) then
       raise exception 'selftest failed: discount not applied (%)', v_again;
+    end if;
+
+    -- A single-use code held by two unpaid checkouts: the second payment is flagged.
+    insert into public.discount_codes (code, discount_type, value, max_uses) values ('SELFTESTONE', 'percent', 10, 1);
+    perform public.create_checkout_order(
+      jsonb_build_array(jsonb_build_object('product_id', v_product.id, 'size', v_product.sizes[1], 'quantity', 1)),
+      jsonb_build_object('full_name', 'Self Test', 'phone', '9876543210', 'email', 'selftest@example.com',
+                         'address', '1 Test Street', 'city', 'Hyderabad', 'state', 'Telangana',
+                         'pincode', '500001', 'country', 'India'),
+      null, 0, 'SELFTESTONE') from generate_series(1, 2);
+    perform public.attach_razorpay_order(o.id, 'order_selftest_one_' || row_number() over (order by o.order_number))
+    from public.orders o where o.discount_code = 'SELFTESTONE';
+    for v_order in select * from public.orders where discount_code = 'SELFTESTONE' order by order_number loop
+      perform public.mark_order_paid(v_order.razorpay_order_id, 'pay_' || v_order.razorpay_order_id,
+        round(v_order.total_amount * 100)::bigint, 'upi', '{}'::jsonb, true);
+    end loop;
+    if (select used_count from public.discount_codes where code = 'SELFTESTONE') <> 1
+       or (select count(*) from public.orders where discount_code = 'SELFTESTONE' and discount_overused) <> 1 then
+      raise exception 'selftest failed: a single-use code was not limited at payment';
     end if;
 
     raise exception 'selftest_ok';

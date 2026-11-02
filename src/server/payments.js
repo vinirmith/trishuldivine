@@ -254,31 +254,35 @@ async function verifyPayment(request, env, ctx) {
   if (!bundle) throw new HttpError(404, 'order_not_found', 'Order not found.');
   const order = bundle.order;
 
-  // The signature already proves Razorpay took this payment for this order. Fetching
-  // the payment lets us also capture it if the account is on manual capture.
-  let payment = null;
-  try { payment = await fetchPayment(env, paymentId); } catch (err) { console.warn('Could not fetch payment', paymentId, err.message); }
+  // The signature proves Razorpay took this payment for this order; fetching it also
+  // checks the amount and captures it if the account is on manual capture. If Razorpay
+  // cannot be reached, leave the order to the webhook (the browser keeps polling).
+  let payment;
+  try {
+    payment = await fetchPayment(env, paymentId);
+  } catch (err) {
+    console.warn('Could not fetch payment', paymentId, err.message);
+    return json({ ok: false, status: 'processing', order_number: order.order_number }, 202);
+  }
 
-  if (payment) {
-    if (payment.order_id !== orderId) throw new HttpError(400, 'invalid_payment', 'This payment does not belong to the order.');
-    if (payment.status === 'failed') throw new HttpError(402, 'payment_failed', 'The payment did not go through.');
-    if (payment.status === 'authorized') {
-      try {
-        payment = await capturePayment(env, paymentId, payment.amount);
-      } catch (err) {
-        console.error('Capture failed for', paymentId, err.message);
-        return json({ ok: false, status: 'processing', order_number: order.order_number }, 202);
-      }
-    }
-    if (payment.status !== 'captured' && payment.status !== 'refunded') {
+  if (payment.order_id !== orderId) throw new HttpError(400, 'invalid_payment', 'This payment does not belong to the order.');
+  if (payment.status === 'failed') throw new HttpError(402, 'payment_failed', 'The payment did not go through.');
+  if (payment.status === 'authorized') {
+    try {
+      payment = await capturePayment(env, paymentId, payment.amount);
+    } catch (err) {
+      console.error('Capture failed for', paymentId, err.message);
       return json({ ok: false, status: 'processing', order_number: order.order_number }, 202);
     }
+  }
+  if (payment.status !== 'captured' && payment.status !== 'refunded') {
+    return json({ ok: false, status: 'processing', order_number: order.order_number }, 202);
   }
 
   const result = await markPaid(env, {
     razorpayOrderId: orderId,
     paymentId,
-    amountPaise: payment ? payment.amount : null,
+    amountPaise: payment.amount,
     method: payment?.method,
     payload: payment,
     signatureVerified: true,
@@ -464,10 +468,28 @@ async function webhook(request, env, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-visitor limits on the anonymous checkout endpoints (Cloudflare rate limiting
+// bindings in wrangler.jsonc). Each quote can call Shiprocket and each order creates
+// a Razorpay order and database rows. Skipped when the binding is not configured.
+const RATE_LIMITED = {
+  'POST /payments/quote': 'QUOTE_LIMITER',
+  'POST /payments/shipping-quote': 'QUOTE_LIMITER',
+  'POST /payments/create-order': 'ORDER_LIMITER',
+};
+
+async function enforceRateLimit(request, env, route) {
+  const limiter = env[RATE_LIMITED[route]];
+  if (!limiter) return;
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const { success } = await limiter.limit({ key: `${route}:${ip}` });
+  if (!success) throw new HttpError(429, 'rate_limited', 'Too many requests. Please wait a minute and try again.');
+}
+
 export async function handlePayments(request, env, ctx) {
   const url = new URL(request.url);
   const route = `${request.method} ${url.pathname.replace(/\/+$/, '')}`;
   try {
+    await enforceRateLimit(request, env, route);
     switch (route) {
       case 'POST /payments/quote': return await quote(request, env);
       case 'POST /payments/shipping-quote': return await quoteShipping(request, env);

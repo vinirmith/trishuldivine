@@ -7,6 +7,11 @@
     "binding": "ASSETS"
   },
   "observability": { "enabled": true },
+  // Per-visitor request limits for the checkout endpoints (see src/server/payments.js).
+  "ratelimits": [
+    { "name": "QUOTE_LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "ORDER_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ],
   // Non-secret settings. Secrets (never put these here) are set with `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
   //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY,

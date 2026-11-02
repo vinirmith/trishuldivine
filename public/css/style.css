@@ -611,6 +611,7 @@ body.has-cart-bar { padding-bottom: 72px; }
 .admin-tab.is-active { border-bottom-color: var(--clay); color: var(--ink); }
 .admin-badge { background: var(--clay); border-radius: 999px; color: var(--white); display: inline-block; font-size: .62rem; letter-spacing: 0; margin-left: 6px; min-width: 20px; padding: 3px 7px; text-align: center; }
 .admin-muted { color: var(--ink-soft); font-size: .8rem; }
+.admin-warning { color: #b42318; font-size: .8rem; font-weight: 600; }
 .admin-pill { border-radius: 999px; display: inline-block; font-size: .66rem; letter-spacing: .8px; padding: 4px 10px; text-transform: uppercase; white-space: nowrap; }
 .admin-pill.is-good { background: rgba(125, 138, 114, .22); color: var(--moss); }
 .admin-pill.is-bad { background: rgba(173, 118, 85, .2); color: #7a4a2e; }

@@ -28,6 +28,9 @@ export default {
 
     const headers = new Headers(request.headers);
     headers.delete('host');
+    // Pass on the visitor's real IP (set by Cloudflare) rather than a client-supplied one.
+    const clientIp = request.headers.get('CF-Connecting-IP');
+    if (clientIp) headers.set('X-Forwarded-For', clientIp);
 
     return fetch(new Request(url, {
       method: request.method,

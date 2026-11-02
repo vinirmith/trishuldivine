@@ -18,6 +18,10 @@ export class ShiprocketError extends Error {
 export const isShiprocketConfigured = (env) => !!(env.SHIPROCKET_EMAIL && env.SHIPROCKET_PASSWORD && env.SHIPROCKET_PICKUP_PINCODE);
 
 let cachedToken = null; // { value, expiresAt } — per Worker instance
+// After a rejected login, wait before trying again: Shiprocket blocks the API user
+// after repeated failed logins, and every shipping quote would otherwise retry.
+const LOGIN_BACKOFF_MS = 10 * 60 * 1000;
+let loginFailure = null; // { error, until }
 
 async function request(method, path, { token, body, query } = {}) {
   const url = new URL(`${API}${path}`);
@@ -39,7 +43,18 @@ async function getToken(env, { fresh = false } = {}) {
   if (!fresh && cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
   // Trimmed: values pasted into the Cloudflare dashboard can carry a stray space or newline.
   const credentials = { email: String(env.SHIPROCKET_EMAIL).trim(), password: String(env.SHIPROCKET_PASSWORD).trim() };
-  const data = await request('POST', '/auth/login', { body: credentials });
+  if (loginFailure && loginFailure.until > Date.now()) throw loginFailure.error;
+  let data;
+  try {
+    data = await request('POST', '/auth/login', { body: credentials });
+  } catch (err) {
+    // 4xx = credentials refused or user blocked; network errors and 5xx retry normally.
+    if (err instanceof ShiprocketError && err.status >= 400 && err.status < 500) {
+      loginFailure = { error: new ShiprocketError(err.status === 401 ? 403 : err.status, { message: `Login refused: ${err.message}` }), until: Date.now() + LOGIN_BACKOFF_MS };
+    }
+    throw err;
+  }
+  loginFailure = null;
   if (!data?.token) throw new ShiprocketError(401, { message: 'Shiprocket login returned no token' });
   cachedToken = { value: data.token, expiresAt: Date.now() + TOKEN_TTL_MS };
   return cachedToken.value;

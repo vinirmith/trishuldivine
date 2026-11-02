@@ -10,7 +10,7 @@
   // Non-secret settings. Secrets (never put these here) are set with `wrangler secret put`:
   //   SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
   //   RAZORPAY_WEBHOOK_SECRET, RESEND_API_KEY,
-  //   SHIPROCKET_EMAIL, SHIPROCKET_PASSWORD (Shiprocket API user), SHIPROCKET_WEBHOOK_TOKEN
+  //   SHIPROCKET_PASSWORD (Shiprocket API user), SHIPROCKET_WEBHOOK_TOKEN
   // See docs/PAYMENTS_SETUP.md.
   "vars": {
     "SUPABASE_URL": "https://acnhzuiisexsiuondawt.supabase.co",
@@ -23,6 +23,8 @@
     // Shiprocket pickup address: the nickname saved in Shiprocket → Settings → Pickup Addresses,
     // and its pincode (used to price couriers at checkout).
     "SHIPROCKET_PICKUP_LOCATION": "Home",
+    // Shiprocket API user's login email (Settings → API Users); its password is a secret.
+    "SHIPROCKET_EMAIL": "trishuldivine26+api@gmail.com",
     "SHIPROCKET_PICKUP_PINCODE": "521185"
   }
 }

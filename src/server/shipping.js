@@ -3,7 +3,7 @@
 //   POST /shipping/push     admin only: (re)send a paid order to Shiprocket
 // Paid orders are also pushed automatically from payments.js once payment is confirmed.
 import { rpc, getUserFromToken, isAdminUser, isUuid } from './supabase.js';
-import { isShiprocketConfigured, cheapestRate, parcelWeightKg, createShiprocketOrder, trackingUrl } from './shiprocket.js';
+import { isShiprocketConfigured, cheapestRate, parcelWeightKg, createShiprocketOrder, bookCheapestCourier, trackingUrl } from './shiprocket.js';
 import { buildShippedEmail, sendEmail } from './email.js';
 import { sha256Hex, safeEqual } from './razorpay.js';
 
@@ -36,6 +36,29 @@ export async function shippingQuote(env, { items, pincode }) {
   return { shipping_fee: rate.fee, courier: rate.courier, estimated_days: String(rate.days || '') };
 }
 
+const autoShip = (env) => String(env.SHIPROCKET_AUTO_SHIP || '').trim().toLowerCase() === 'true';
+
+// Books the courier and pickup for an order just created in Shiprocket. A failure here
+// (e.g. low wallet balance) leaves the order in Shiprocket to be shipped by hand; the
+// reason shows as the order's shipping status in the admin page.
+async function bookCourier(env, bundle, created) {
+  const update = { p_shiprocket_order_id: created.shiprocketOrderId, p_order_number: bundle.order.order_number, p_etd: null };
+  try {
+    const quantity = bundle.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const booking = await bookCheapestCourier(env, { shipmentId: created.shipmentId, pincode: bundle.order.shipping_details?.pincode, quantity });
+    await rpc(env, 'record_shipment_update', {
+      ...update, p_awb: booking.awb, p_courier: booking.courier,
+      p_status: booking.pickupError ? 'AWB ASSIGNED - SCHEDULE PICKUP IN SHIPROCKET' : 'PICKUP SCHEDULED',
+    });
+    if (booking.pickupError) console.error('Shiprocket pickup failed for', bundle.order.order_number, booking.pickupError);
+  } catch (err) {
+    console.error('Shiprocket courier booking failed for', bundle.order.order_number, err.message);
+    await rpc(env, 'record_shipment_update', {
+      ...update, p_awb: null, p_courier: null, p_status: `SHIP MANUALLY: ${String(err.message).slice(0, 120)}`,
+    }).catch(() => {});
+  }
+}
+
 // Sends a paid order to Shiprocket once. Safe to call any number of times.
 export async function pushOrderToShiprocket(env, orderId) {
   if (!isShiprocketConfigured(env)) return { skipped: 'not_configured' };
@@ -48,6 +71,7 @@ export async function pushOrderToShiprocket(env, orderId) {
     await rpc(env, 'finish_shiprocket_push', {
       p_order_id: orderId, p_ok: true, p_shiprocket_order_id: created.shiprocketOrderId, p_shipment_id: created.shipmentId,
     });
+    if (autoShip(env) && created.shipmentId) await bookCourier(env, bundle, created);
     return { sent: true, ...created };
   } catch (err) {
     console.error('Shiprocket push failed for', bundle.order.order_number, err.message);

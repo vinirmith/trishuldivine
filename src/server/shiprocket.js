@@ -105,6 +105,7 @@ async function lookupCheapestRate(env, { pincode, weightKg }) {
   const best = couriers.reduce((a, b) => (b.charge < a.charge ? b : a));
   return {
     fee: Math.ceil(best.charge),
+    courierId: best.courier_company_id,
     courier: best.courier_name || '',
     days: best.estimated_delivery_days || '',
     etd: best.etd || '',
@@ -159,6 +160,29 @@ export async function createShiprocketOrder(env, { order, items }) {
   });
   if (!data?.order_id) throw new ShiprocketError(502, { message: `Unexpected Shiprocket response: ${JSON.stringify(data).slice(0, 300)}` });
   return { shiprocketOrderId: String(data.order_id), shipmentId: data.shipment_id ? String(data.shipment_id) : null };
+}
+
+// Books the cheapest courier for a created shipment (the same choice checkout priced)
+// and schedules pickup. The courier charge comes out of the Shiprocket wallet.
+export async function bookCheapestCourier(env, { shipmentId, pincode, quantity }) {
+  const rate = await lookupCheapestRate(env, { pincode, weightKg: parcelWeightKg(quantity) });
+  if (!rate?.courierId) throw new ShiprocketError(409, { message: `No courier available to ${pincode}` });
+
+  const assigned = await call(env, 'POST', '/courier/assign/awb', {
+    body: { shipment_id: Number(shipmentId), courier_id: Number(rate.courierId) },
+  });
+  const awbData = assigned?.response?.data || {};
+  if (assigned?.awb_assign_status !== 1 || !awbData.awb_code) {
+    throw new ShiprocketError(402, { message: awbData.awb_assign_error || assigned?.message || 'Courier could not be assigned' });
+  }
+  const booking = { awb: String(awbData.awb_code), courier: awbData.courier_name || rate.courier, pickupError: null };
+
+  try {
+    await call(env, 'POST', '/courier/generate/pickup', { body: { shipment_id: [Number(shipmentId)] } });
+  } catch (err) {
+    booking.pickupError = err.message; // the courier is booked; pickup can be scheduled in Shiprocket
+  }
+  return booking;
 }
 
 export const trackingUrl = (awb) => (awb ? `https://shiprocket.co/tracking/${encodeURIComponent(awb)}` : '');

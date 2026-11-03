@@ -89,7 +89,7 @@ Note: `wrangler deploy` replaces plain variables with the ones in `wrangler.json
 How it works:
 1. **Checkout fee.** When the customer types a 6-digit pincode, `/payments/shipping-quote` asks Shiprocket for courier rates from `SHIPROCKET_PICKUP_PINCODE` to that pincode (100 g per item, box 10x10x5 cm, prepaid) and charges the **cheapest** courier, rounded up to the rupee. `create-order` works the fee out again on the server, so the browser can never change it. Unserviceable pincodes are refused with a message. **Until the Shiprocket secrets are set, shipping is free** and checkout works as before.
 2. **After payment.** The paid order is created in Shiprocket automatically (`order_id` = our order number, e.g. `TD-1042`). If that fails, the order shows "Not in Shiprocket" in Admin → Orders with the error and a **Retry sending to Shiprocket** button.
-3. **You ship from the Shiprocket panel:** pick the courier, generate the label, schedule the pickup.
+3. **Courier and pickup.** With `SHIPROCKET_AUTO_SHIP` = `"true"` (`wrangler.jsonc`), the site then books the **cheapest** courier (the one checkout priced; the charge comes from the Shiprocket wallet) and schedules the pickup, so you only print the label (Shiprocket → Orders) and pack. If booking fails (e.g. low wallet balance), the order's shipping status in Admin → Orders starts with **SHIP MANUALLY** and the reason: ship it from the Shiprocket panel. With `"false"`, you pick the courier and schedule pickup in Shiprocket for every order.
 4. **Tracking.** Shiprocket's webhook (`/shipping/webhook`) updates the order: courier, AWB, status. The first time the parcel is picked up / in transit the order becomes **shipped** and the customer gets a "your order has shipped" email with a tracking link; on delivery it becomes **delivered**.
 
 Setup:
@@ -105,4 +105,4 @@ Tracking events are logged in `webhook_events` with source `shiprocket`.
 ## Not included yet (next steps)
 - GST invoice PDF, COD and delivery outside India (checkout is India-only).
 - Free-shipping threshold (e.g. free above ₹999) — easy to add on top of the Shiprocket rate.
-- Booking the courier / label / pickup from our admin (done in the Shiprocket panel for now).
+- Printing the label from our admin (done in the Shiprocket panel).
